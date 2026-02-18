@@ -18,7 +18,7 @@ export function MetricCard({
   subtitle,
   icon: Icon,
   trend,
-  accentColor = "text-blue-400",
+  accentColor = "text-blue-500",
   urgent,
 }: MetricCardProps) {
   return (

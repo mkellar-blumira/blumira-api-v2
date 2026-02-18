@@ -69,6 +69,29 @@ async function apiGet<T = unknown>(
   return response.json();
 }
 
+async function apiPatch<T = unknown>(
+  path: string,
+  token: string,
+  body: Record<string, unknown>
+): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`API PATCH failed (${response.status}): ${text}`);
+  }
+
+  return response.json();
+}
+
 export interface MspAccount {
   account_id: string;
   name: string;
@@ -87,12 +110,31 @@ export interface Finding {
   name: string;
   priority: number;
   status_name: string;
+  status?: number;
   type_name: string;
+  type?: number;
   created: string;
   modified: string;
   org_name: string;
   org_id: string;
   resolution_name?: string;
+  resolution?: number;
+  assigned_to?: string;
+  assigned_to_name?: string;
+  description?: string;
+  summary?: string;
+  source?: string;
+  category?: string;
+  subcategory?: string;
+  evidence?: string;
+  notes?: string;
+  ip_address?: string;
+  hostname?: string;
+  url?: string;
+  user?: string;
+  workflow_name?: string;
+  rule_name?: string;
+  detector_name?: string;
 }
 
 export interface AgentDevice {
@@ -227,6 +269,44 @@ export interface EnrichedAccount extends MspAccount {
     excludedDevices: number;
     agentKeysCount: number;
   };
+}
+
+export interface FindingUpdate {
+  status?: number;
+  priority?: number;
+  assigned_to?: string;
+  resolution?: number;
+  notes?: string;
+}
+
+export async function updateFinding(
+  token: string,
+  accountId: string,
+  findingId: string,
+  updates: FindingUpdate
+): Promise<Finding> {
+  const res = await apiPatch<ApiResponse<Finding> & Finding>(
+    `/msp/accounts/${accountId}/findings/${findingId}`,
+    token,
+    updates as Record<string, unknown>
+  );
+  return res.data || res;
+}
+
+export async function fetchFindingDetail(
+  token: string,
+  accountId: string,
+  findingId: string
+): Promise<Finding | null> {
+  try {
+    const res = await apiGet<ApiResponse<Finding> & Finding>(
+      `/msp/accounts/${accountId}/findings/${findingId}`,
+      token
+    );
+    return res.data || res;
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchEnrichedAccount(

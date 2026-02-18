@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -8,20 +8,17 @@ import {
   ExternalLink,
   Clock,
   Filter,
-  ArrowUpDown,
   ChevronDown,
   ChevronUp,
+  User,
+  Loader2,
 } from "lucide-react";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -29,13 +26,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Finding } from "@/lib/blumira-api";
 import { formatDistanceToNow } from "date-fns";
+import { FindingDetailDialog } from "./finding-detail-dialog";
 
 interface FindingsViewProps {
   findings: Finding[];
   searchTerm: string;
+  onFindingsUpdate?: () => void;
 }
 
 type SortField = "priority" | "created" | "name" | "org_name";
@@ -44,9 +42,9 @@ type SortDir = "asc" | "desc";
 function getStatusIcon(status: string) {
   switch (status.toLowerCase()) {
     case "open":
-      return <AlertCircle className="h-3.5 w-3.5 text-red-400" />;
+      return <AlertCircle className="h-3.5 w-3.5 text-red-500" />;
     case "closed":
-      return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />;
+      return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />;
     case "dismissed":
       return <XCircle className="h-3.5 w-3.5 text-gray-400" />;
     default:
@@ -66,13 +64,16 @@ function getPriorityBadge(priority: number) {
   return <Badge variant={entry.variant}>{entry.label}</Badge>;
 }
 
-export function FindingsView({ findings, searchTerm }: FindingsViewProps) {
+export function FindingsView({ findings, searchTerm, onFindingsUpdate }: FindingsViewProps) {
   const [orgFilter, setOrgFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortField, setSortField] = useState<SortField>("priority");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [showCount, setShowCount] = useState(50);
+  const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const organizations = useMemo(
     () => [...new Set(findings.map((f) => f.org_name))].sort(),
@@ -92,7 +93,9 @@ export function FindingsView({ findings, searchTerm }: FindingsViewProps) {
         (f) =>
           f.name.toLowerCase().includes(term) ||
           f.org_name.toLowerCase().includes(term) ||
-          f.type_name.toLowerCase().includes(term)
+          f.type_name.toLowerCase().includes(term) ||
+          (f.assigned_to_name && f.assigned_to_name.toLowerCase().includes(term)) ||
+          (f.assigned_to && f.assigned_to.toLowerCase().includes(term))
       );
     }
 
@@ -148,6 +151,39 @@ export function FindingsView({ findings, searchTerm }: FindingsViewProps) {
     }
   };
 
+  const handleRowClick = (finding: Finding) => {
+    setSelectedFinding(finding);
+    setDialogOpen(true);
+  };
+
+  const handleUpdate = useCallback(async (finding: Finding, updates: Record<string, unknown>) => {
+    setUpdatingId(finding.finding_id);
+    try {
+      const res = await fetch("/api/blumira/findings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accountId: finding.org_id,
+          findingId: finding.finding_id,
+          ...updates,
+        }),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.error || "Failed to update finding");
+      }
+
+      onFindingsUpdate?.();
+    } finally {
+      setUpdatingId(null);
+    }
+  }, [onFindingsUpdate]);
+
+  const openCount = findings.filter((f) => f.status_name === "Open").length;
+  const criticalCount = findings.filter((f) => f.priority === 1).length;
+
   const SortButton = ({
     field,
     children,
@@ -171,13 +207,25 @@ export function FindingsView({ findings, searchTerm }: FindingsViewProps) {
 
   return (
     <div className="space-y-6 p-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">
-          Security Findings
-        </h2>
-        <p className="text-muted-foreground">
-          {filtered.length} of {findings.length} findings
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">
+            Security Findings
+          </h2>
+          <p className="text-muted-foreground">
+            {filtered.length} of {findings.length} findings
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          {criticalCount > 0 && (
+            <Badge variant="destructive" className="text-xs">
+              {criticalCount} Critical
+            </Badge>
+          )}
+          <Badge variant="warning" className="text-xs">
+            {openCount} Open
+          </Badge>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -242,11 +290,12 @@ export function FindingsView({ findings, searchTerm }: FindingsViewProps) {
 
       <Card>
         <CardContent className="p-0">
-          <div className="grid grid-cols-[1fr_150px_100px_100px_120px_40px] gap-4 items-center px-4 py-3 border-b text-xs font-medium text-muted-foreground">
+          <div className="grid grid-cols-[1fr_150px_100px_100px_100px_120px_40px] gap-4 items-center px-4 py-3 border-b text-xs font-medium text-muted-foreground bg-muted/30">
             <SortButton field="name">Finding</SortButton>
             <SortButton field="org_name">Organization</SortButton>
             <SortButton field="priority">Priority</SortButton>
             <span>Status</span>
+            <span>Assignee</span>
             <SortButton field="created">Created</SortButton>
             <span />
           </div>
@@ -264,10 +313,11 @@ export function FindingsView({ findings, searchTerm }: FindingsViewProps) {
               {filtered.slice(0, showCount).map((finding) => (
                 <div
                   key={finding.finding_id}
-                  className="grid grid-cols-[1fr_150px_100px_100px_120px_40px] gap-4 items-center px-4 py-3 border-b last:border-0 hover:bg-muted/30 transition-colors"
+                  onClick={() => handleRowClick(finding)}
+                  className="grid grid-cols-[1fr_150px_100px_100px_100px_120px_40px] gap-4 items-center px-4 py-3 border-b last:border-0 hover:bg-blue-50/50 transition-colors cursor-pointer group"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">
+                    <p className="text-sm font-medium truncate group-hover:text-blue-700 transition-colors">
                       {finding.name}
                     </p>
                     <p className="text-xs text-muted-foreground truncate">
@@ -282,20 +332,44 @@ export function FindingsView({ findings, searchTerm }: FindingsViewProps) {
                     {getStatusIcon(finding.status_name)}
                     <span className="text-xs">{finding.status_name}</span>
                   </div>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {(finding.assigned_to_name || finding.assigned_to) ? (
+                      <>
+                        <User className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <span className="text-xs truncate">
+                          {finding.assigned_to_name || finding.assigned_to}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </div>
                   <span className="text-xs text-muted-foreground">
                     {formatDistanceToNow(new Date(finding.created), {
                       addSuffix: true,
                     })}
                   </span>
-                  <Button variant="ghost" size="icon" asChild className="h-7 w-7">
-                    <a
-                      href={`https://app.blumira.com/${finding.org_id}/reporting/findings/${finding.finding_id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
-                  </Button>
+                  <div className="flex items-center">
+                    {updatingId === finding.finding_id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        asChild
+                        className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <a
+                          href={`https://app.blumira.com/${finding.org_id}/reporting/findings/${finding.finding_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
               {filtered.length > showCount && (
@@ -313,6 +387,13 @@ export function FindingsView({ findings, searchTerm }: FindingsViewProps) {
           )}
         </CardContent>
       </Card>
+
+      <FindingDetailDialog
+        finding={selectedFinding}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onUpdate={handleUpdate}
+      />
     </div>
   );
 }

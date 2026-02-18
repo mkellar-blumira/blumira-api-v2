@@ -184,7 +184,11 @@ export function DashboardShell() {
             />
           )}
           {activeView === "findings" && (
-            <FindingsView findings={findings} searchTerm={searchTerm} />
+            <FindingsView
+              findings={findings}
+              searchTerm={searchTerm}
+              onFindingsUpdate={handleRefresh}
+            />
           )}
           {activeView === "organizations" && <OrganizationsView />}
           {activeView === "agents" && <AgentsView />}

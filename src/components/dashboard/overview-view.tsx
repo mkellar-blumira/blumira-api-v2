@@ -6,7 +6,6 @@ import {
   Activity,
   Clock,
   Building2,
-  Monitor,
   ExternalLink,
   AlertCircle,
   CheckCircle2,
@@ -29,9 +28,9 @@ interface OverviewViewProps {
 function getStatusIcon(status: string) {
   switch (status.toLowerCase()) {
     case "open":
-      return <AlertCircle className="h-3.5 w-3.5 text-red-400" />;
+      return <AlertCircle className="h-3.5 w-3.5 text-red-500" />;
     case "closed":
-      return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />;
+      return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />;
     case "dismissed":
       return <XCircle className="h-3.5 w-3.5 text-gray-400" />;
     default:
@@ -90,7 +89,7 @@ export function OverviewView({
     2: "bg-amber-500",
     3: "bg-blue-500",
     4: "bg-emerald-500",
-    5: "bg-gray-500",
+    5: "bg-gray-400",
   };
 
   return (
@@ -110,14 +109,14 @@ export function OverviewView({
           value={findings.length}
           subtitle="Across all accounts"
           icon={Shield}
-          accentColor="text-blue-400"
+          accentColor="text-blue-500"
         />
         <MetricCard
           title="Critical"
           value={criticalFindings.length}
           subtitle="Immediate attention needed"
           icon={AlertTriangle}
-          accentColor="text-red-400"
+          accentColor="text-red-500"
           urgent={criticalFindings.length > 0}
         />
         <MetricCard
@@ -125,14 +124,14 @@ export function OverviewView({
           value={openFindings.length}
           subtitle="Awaiting resolution"
           icon={Activity}
-          accentColor="text-amber-400"
+          accentColor="text-amber-500"
         />
         <MetricCard
           title="Recent (7d)"
           value={recentFindings.length}
           subtitle={`${accountCount} organizations`}
           icon={Clock}
-          accentColor="text-emerald-400"
+          accentColor="text-emerald-500"
         />
       </div>
 
@@ -140,7 +139,7 @@ export function OverviewView({
         <Card className="lg:col-span-4">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-red-400" />
+              <AlertTriangle className="h-4 w-4 text-red-500" />
               Critical Findings
             </CardTitle>
             {criticalFindings.length > 0 && (
@@ -156,8 +155,8 @@ export function OverviewView({
           <CardContent>
             {criticalFindings.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
-                <div className="rounded-full bg-emerald-500/10 p-3 mb-3">
-                  <CheckCircle2 className="h-6 w-6 text-emerald-400" />
+                <div className="rounded-full bg-emerald-50 p-3 mb-3">
+                  <CheckCircle2 className="h-6 w-6 text-emerald-500" />
                 </div>
                 <p className="text-sm font-medium">No Critical Findings</p>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -170,7 +169,7 @@ export function OverviewView({
                   {criticalFindings.slice(0, 10).map((finding) => (
                     <div
                       key={finding.finding_id}
-                      className="flex items-start gap-3 rounded-lg border border-red-500/20 bg-red-500/5 p-3"
+                      className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-3"
                     >
                       <div className="mt-0.5">
                         {getStatusIcon(finding.status_name)}
