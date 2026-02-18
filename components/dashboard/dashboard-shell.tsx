@@ -80,8 +80,8 @@ export function DashboardShell() {
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
-            <Shield className="h-12 w-12 text-blue-500" />
-            <Loader2 className="h-5 w-5 text-blue-400 animate-spin absolute -bottom-1 -right-1" />
+            <Shield className="h-12 w-12 text-blue-600" />
+            <Loader2 className="h-5 w-5 text-blue-500 animate-spin absolute -bottom-1 -right-1" />
           </div>
           <div className="text-center">
             <h2 className="text-lg font-semibold">Blumira MSP Dashboard</h2>
@@ -97,11 +97,11 @@ export function DashboardShell() {
   if (credentialsMissing) {
     return (
       <div className="flex h-screen items-center justify-center bg-background p-4">
-        <Card className="max-w-md w-full border-amber-500/30">
+          <Card className="max-w-md w-full border-amber-300">
           <CardContent className="p-8 text-center space-y-4">
             <div className="flex justify-center">
-              <div className="rounded-full bg-amber-500/10 p-4">
-                <AlertTriangle className="h-8 w-8 text-amber-400" />
+              <div className="rounded-full bg-amber-100 p-4">
+                <AlertTriangle className="h-8 w-8 text-amber-600" />
               </div>
             </div>
             <div>
@@ -126,11 +126,11 @@ export function DashboardShell() {
   if (error && !data) {
     return (
       <div className="flex h-screen items-center justify-center bg-background p-4">
-        <Card className="max-w-md w-full border-red-500/30">
+          <Card className="max-w-md w-full border-red-300">
           <CardContent className="p-8 text-center space-y-4">
             <div className="flex justify-center">
-              <div className="rounded-full bg-red-500/10 p-4">
-                <AlertTriangle className="h-8 w-8 text-red-400" />
+              <div className="rounded-full bg-red-100 p-4">
+                <AlertTriangle className="h-8 w-8 text-red-600" />
               </div>
             </div>
             <div>

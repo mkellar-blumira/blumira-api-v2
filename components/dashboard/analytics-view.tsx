@@ -83,11 +83,11 @@ export function AnalyticsView({ findings }: AnalyticsViewProps) {
   const priorityData = useMemo(
     () =>
       [
-        { priority: 1, label: "Critical", color: "text-red-400" },
-        { priority: 2, label: "High", color: "text-amber-400" },
-        { priority: 3, label: "Medium", color: "text-blue-400" },
-        { priority: 4, label: "Low", color: "text-emerald-400" },
-        { priority: 5, label: "Info", color: "text-gray-400" },
+        { priority: 1, label: "Critical", color: "text-red-600" },
+        { priority: 2, label: "High", color: "text-amber-600" },
+        { priority: 3, label: "Medium", color: "text-blue-600" },
+        { priority: 4, label: "Low", color: "text-emerald-600" },
+        { priority: 5, label: "Info", color: "text-gray-500" },
       ].map((p) => ({
         ...p,
         count: findings.filter((f) => f.priority === p.priority).length,
@@ -188,7 +188,7 @@ export function AnalyticsView({ findings }: AnalyticsViewProps) {
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="p-5 text-center">
-            <p className="text-3xl font-bold text-red-400">
+            <p className="text-3xl font-bold text-red-600">
               {priorityData[0].count}
             </p>
             <p className="text-xs text-muted-foreground mt-1">Critical</p>
@@ -196,7 +196,7 @@ export function AnalyticsView({ findings }: AnalyticsViewProps) {
         </Card>
         <Card>
           <CardContent className="p-5 text-center">
-            <p className="text-3xl font-bold text-amber-400">
+            <p className="text-3xl font-bold text-amber-600">
               {priorityData[1].count}
             </p>
             <p className="text-xs text-muted-foreground mt-1">High</p>
@@ -204,7 +204,7 @@ export function AnalyticsView({ findings }: AnalyticsViewProps) {
         </Card>
         <Card>
           <CardContent className="p-5 text-center">
-            <p className="text-3xl font-bold text-emerald-400">
+            <p className="text-3xl font-bold text-emerald-600">
               {closedFindings.length}
             </p>
             <p className="text-xs text-muted-foreground mt-1">Resolved</p>
@@ -212,7 +212,7 @@ export function AnalyticsView({ findings }: AnalyticsViewProps) {
         </Card>
         <Card>
           <CardContent className="p-5 text-center">
-            <p className="text-3xl font-bold text-blue-400">
+            <p className="text-3xl font-bold text-blue-600">
               {avgCloseTime}h
             </p>
             <p className="text-xs text-muted-foreground mt-1">

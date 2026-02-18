@@ -117,9 +117,9 @@ export function SettingsView() {
               <h4 className="text-sm font-medium">Connection Status</h4>
               <div className="flex items-center gap-3 p-3 rounded-lg border">
                 {status.hasCredentials ? (
-                  <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
                 ) : (
-                  <AlertTriangle className="h-5 w-5 text-amber-400" />
+                  <AlertTriangle className="h-5 w-5 text-amber-600" />
                 )}
                 <div className="flex-1">
                   <p className="text-sm font-medium">
@@ -143,17 +143,17 @@ export function SettingsView() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center gap-2 p-2 rounded border">
                   {status.hasClientId ? (
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
                   ) : (
-                    <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
+                    <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
                   )}
                   <span className="text-xs">Client ID</span>
                 </div>
                 <div className="flex items-center gap-2 p-2 rounded border">
                   {status.hasClientSecret ? (
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
                   ) : (
-                    <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
+                    <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
                   )}
                   <span className="text-xs">Client Secret</span>
                 </div>
@@ -248,14 +248,14 @@ export function SettingsView() {
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 p-3 rounded-lg border border-red-500/30 bg-red-500/5 text-red-400 text-sm">
+            <div className="flex items-center gap-2 p-3 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm">
               <AlertTriangle className="h-4 w-4 shrink-0" />
               {error}
             </div>
           )}
 
           {success && (
-            <div className="flex items-center gap-2 p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 text-emerald-400 text-sm">
+            <div className="flex items-center gap-2 p-3 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
               {success}
             </div>

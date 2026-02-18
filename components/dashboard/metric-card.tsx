@@ -18,7 +18,7 @@ export function MetricCard({
   subtitle,
   icon: Icon,
   trend,
-  accentColor = "text-blue-400",
+  accentColor = "text-blue-600",
   urgent,
 }: MetricCardProps) {
   return (
@@ -58,7 +58,7 @@ export function MetricCard({
             <span
               className={cn(
                 "font-medium",
-                trend.value >= 0 ? "text-emerald-400" : "text-red-400"
+                trend.value >= 0 ? "text-emerald-600" : "text-red-600"
               )}
             >
               {trend.value >= 0 ? "+" : ""}

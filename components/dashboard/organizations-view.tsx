@@ -84,9 +84,9 @@ export function OrganizationsView() {
   if (error) {
     return (
       <div className="p-6">
-        <Card className="border-red-500/30">
+        <Card className="border-red-300">
           <CardContent className="p-6 text-center">
-            <AlertTriangle className="h-8 w-8 text-red-400 mx-auto mb-3" />
+            <AlertTriangle className="h-8 w-8 text-red-600 mx-auto mb-3" />
             <p className="text-sm font-medium">{error}</p>
             <Button
               variant="outline"
@@ -143,26 +143,26 @@ export function OrganizationsView() {
           title="Organizations"
           value={organizations.length}
           icon={Building2}
-          accentColor="text-blue-400"
+          accentColor="text-blue-600"
         />
         <MetricCard
           title="Total Users"
           value={totals.totalUsers || 0}
           icon={Users}
-          accentColor="text-indigo-400"
+          accentColor="text-indigo-600"
         />
         <MetricCard
           title="Devices"
           value={totals.totalDevices || 0}
           subtitle={`${totals.onlineDevices || 0} online`}
           icon={Monitor}
-          accentColor="text-emerald-400"
+          accentColor="text-emerald-600"
         />
         <MetricCard
           title="Critical Findings"
           value={totals.criticalFindings || 0}
           icon={AlertTriangle}
-          accentColor="text-red-400"
+          accentColor="text-red-600"
           urgent={(totals.criticalFindings || 0) > 0}
         />
       </div>
@@ -192,7 +192,7 @@ export function OrganizationsView() {
                 }
               >
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                  <Building2 className="h-4 w-4 text-blue-400" />
+                  <Building2 className="h-4 w-4 text-blue-600" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -220,7 +220,7 @@ export function OrganizationsView() {
                     <p className="text-muted-foreground">Findings</p>
                   </div>
                   <div className="text-center">
-                    <p className="font-semibold tabular-nums text-red-400">
+                    <p className="font-semibold tabular-nums text-red-600">
                       {org.stats.criticalFindings}
                     </p>
                     <p className="text-muted-foreground">Critical</p>
@@ -307,7 +307,7 @@ export function OrganizationsView() {
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground flex items-center gap-1">
-                            <Wifi className="h-3 w-3 text-emerald-400" />
+                            <Wifi className="h-3 w-3 text-emerald-600" />
                             Online
                           </span>
                           <span className="font-medium">
@@ -316,7 +316,7 @@ export function OrganizationsView() {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground flex items-center gap-1">
-                            <WifiOff className="h-3 w-3 text-amber-400" />
+                            <WifiOff className="h-3 w-3 text-amber-600" />
                             Sleeping
                           </span>
                           <span className="font-medium">
@@ -325,7 +325,7 @@ export function OrganizationsView() {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground flex items-center gap-1">
-                            <Ban className="h-3 w-3 text-red-400" />
+                            <Ban className="h-3 w-3 text-red-600" />
                             Isolated
                           </span>
                           <span className="font-medium">
@@ -334,7 +334,7 @@ export function OrganizationsView() {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground flex items-center gap-1">
-                            <EyeOff className="h-3 w-3 text-gray-400" />
+                            <EyeOff className="h-3 w-3 text-gray-500" />
                             Excluded
                           </span>
                           <span className="font-medium">
@@ -362,13 +362,13 @@ export function OrganizationsView() {
                           <span className="text-muted-foreground">
                             Critical
                           </span>
-                          <span className="font-medium text-red-400">
+                          <span className="font-medium text-red-600">
                             {org.stats.criticalFindings}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Open</span>
-                          <span className="font-medium text-amber-400">
+                          <span className="font-medium text-amber-600">
                             {org.stats.openFindings}
                           </span>
                         </div>
@@ -395,13 +395,13 @@ export function OrganizationsView() {
                           >
                             <div className="flex items-center gap-2 mb-1">
                               {device.is_excluded ? (
-                                <EyeOff className="h-3 w-3 text-gray-400" />
+                                <EyeOff className="h-3 w-3 text-gray-500" />
                               ) : device.is_isolated ? (
-                                <Ban className="h-3 w-3 text-red-400" />
+                                <Ban className="h-3 w-3 text-red-600" />
                               ) : device.is_sleeping ? (
-                                <WifiOff className="h-3 w-3 text-amber-400" />
+                                <WifiOff className="h-3 w-3 text-amber-600" />
                               ) : (
-                                <Wifi className="h-3 w-3 text-emerald-400" />
+                                <Wifi className="h-3 w-3 text-emerald-600" />
                               )}
                               <span className="font-medium truncate">
                                 {device.hostname}

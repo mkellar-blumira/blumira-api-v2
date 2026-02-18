@@ -44,13 +44,13 @@ type SortDir = "asc" | "desc";
 function getStatusIcon(status: string) {
   switch (status.toLowerCase()) {
     case "open":
-      return <AlertCircle className="h-3.5 w-3.5 text-red-400" />;
+      return <AlertCircle className="h-3.5 w-3.5 text-red-600" />;
     case "closed":
-      return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />;
+      return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />;
     case "dismissed":
-      return <XCircle className="h-3.5 w-3.5 text-gray-400" />;
+      return <XCircle className="h-3.5 w-3.5 text-gray-500" />;
     default:
-      return <AlertCircle className="h-3.5 w-3.5 text-gray-400" />;
+      return <AlertCircle className="h-3.5 w-3.5 text-gray-500" />;
   }
 }
 

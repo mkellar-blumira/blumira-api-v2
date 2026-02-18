@@ -127,10 +127,10 @@ export function AgentsView() {
   );
 
   function getDeviceStatusIcon(device: AgentDevice) {
-    if (device.is_excluded) return <EyeOff className="h-3.5 w-3.5 text-gray-400" />;
-    if (device.is_isolated) return <Ban className="h-3.5 w-3.5 text-red-400" />;
-    if (device.is_sleeping) return <WifiOff className="h-3.5 w-3.5 text-amber-400" />;
-    return <Wifi className="h-3.5 w-3.5 text-emerald-400" />;
+    if (device.is_excluded) return <EyeOff className="h-3.5 w-3.5 text-gray-500" />;
+    if (device.is_isolated) return <Ban className="h-3.5 w-3.5 text-red-600" />;
+    if (device.is_sleeping) return <WifiOff className="h-3.5 w-3.5 text-amber-600" />;
+    return <Wifi className="h-3.5 w-3.5 text-emerald-600" />;
   }
 
   function getDeviceStatusBadge(device: AgentDevice) {
@@ -160,9 +160,9 @@ export function AgentsView() {
   if (error) {
     return (
       <div className="p-6">
-        <Card className="border-red-500/30">
+        <Card className="border-red-300">
           <CardContent className="p-6 text-center">
-            <AlertTriangle className="h-8 w-8 text-red-400 mx-auto mb-3" />
+            <AlertTriangle className="h-8 w-8 text-red-600 mx-auto mb-3" />
             <p className="text-sm font-medium">{error}</p>
             <Button variant="outline" size="sm" className="mt-4" onClick={fetchData}>
               <RefreshCw className="h-4 w-4 mr-2" />
@@ -196,32 +196,32 @@ export function AgentsView() {
           title="Total Devices"
           value={totals.total}
           icon={HardDrive}
-          accentColor="text-blue-400"
+          accentColor="text-blue-600"
         />
         <MetricCard
           title="Online"
           value={totals.online}
           icon={Wifi}
-          accentColor="text-emerald-400"
+          accentColor="text-emerald-600"
         />
         <MetricCard
           title="Sleeping"
           value={totals.sleeping}
           icon={WifiOff}
-          accentColor="text-amber-400"
+          accentColor="text-amber-600"
         />
         <MetricCard
           title="Isolated"
           value={totals.isolated}
           icon={Ban}
-          accentColor="text-red-400"
+          accentColor="text-red-600"
           urgent={totals.isolated > 0}
         />
         <MetricCard
           title="Agent Keys"
           value={totals.keys}
           icon={Key}
-          accentColor="text-indigo-400"
+          accentColor="text-indigo-600"
         />
       </div>
 
@@ -291,7 +291,7 @@ export function AgentsView() {
                   })}
                 </p>
                 {device.isolation_requested && (
-                  <p className="text-red-400 font-medium">
+                  <p className="text-red-600 font-medium">
                     Isolation requested
                   </p>
                 )}

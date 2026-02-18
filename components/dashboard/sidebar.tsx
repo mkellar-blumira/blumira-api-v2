@@ -55,7 +55,7 @@ export function Sidebar({
         <div className="flex h-16 items-center border-b border-border px-4">
           {!collapsed && (
             <div className="flex items-center gap-2">
-              <Shield className="h-7 w-7 text-blue-500" />
+              <Shield className="h-7 w-7 text-blue-600" />
               <div>
                 <h1 className="text-sm font-bold text-foreground tracking-tight">
                   BLUMIRA
@@ -67,7 +67,7 @@ export function Sidebar({
             </div>
           )}
           {collapsed && (
-            <Shield className="h-7 w-7 text-blue-500 mx-auto" />
+            <Shield className="h-7 w-7 text-blue-600 mx-auto" />
           )}
         </div>
 
@@ -82,7 +82,7 @@ export function Sidebar({
                 className={cn(
                   "flex items-center gap-3 w-full rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-sidebar-accent text-blue-400"
+                    ? "bg-sidebar-accent text-blue-600"
                     : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
                   collapsed && "justify-center px-2"
                 )}
@@ -95,7 +95,7 @@ export function Sidebar({
                   item.id === "findings" &&
                   findingsBadge !== undefined &&
                   findingsBadge > 0 && (
-                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500/20 px-1.5 text-[10px] font-semibold text-red-400">
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-100 px-1.5 text-[10px] font-semibold text-red-600">
                       {findingsBadge}
                     </span>
                   )}
@@ -111,7 +111,7 @@ export function Sidebar({
                     {item.id === "findings" &&
                       findingsBadge !== undefined &&
                       findingsBadge > 0 && (
-                        <span className="rounded-full bg-red-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-red-400">
+                        <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-600">
                           {findingsBadge}
                         </span>
                       )}
