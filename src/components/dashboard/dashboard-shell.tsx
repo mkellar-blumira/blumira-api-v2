@@ -180,6 +180,7 @@ export function DashboardShell() {
               findings={findings}
               accountCount={data?.accounts?.length || 0}
               onNavigate={setActiveView}
+              users={data?.users || []}
             />
           )}
           {activeView === "findings" && (

@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   AlertCircle,
   CheckCircle2,
@@ -262,7 +261,7 @@ export function FindingDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="space-y-2">
             <DialogTitle className="text-lg leading-tight pr-8">
@@ -336,8 +335,7 @@ export function FindingDetailDialog({
           </div>
         )}
 
-        <ScrollArea className="flex-1 -mx-6 px-6">
-          <div className="space-y-4 pb-4">
+        <div className="space-y-4">
             {loadingDetail && (
               <div className="flex items-center justify-center py-4">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -453,7 +451,6 @@ export function FindingDetailDialog({
               <p className="text-xs text-muted-foreground">Press Ctrl+Enter to send. Notes are stored locally in your browser.</p>
             </div>
           </div>
-        </ScrollArea>
       </DialogContent>
     </Dialog>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Shield,
   AlertTriangle,
@@ -16,13 +17,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MetricCard } from "./metric-card";
-import type { Finding } from "@/lib/blumira-api";
+import { FindingDetailDialog } from "./finding-detail-dialog";
+import type { Finding, BlumiraUser } from "@/lib/blumira-api";
 import { formatDistanceToNow } from "date-fns";
 
 interface OverviewViewProps {
   findings: Finding[];
   accountCount: number;
   onNavigate: (view: string) => void;
+  users: BlumiraUser[];
 }
 
 function getStatusIcon(status: string) {
@@ -54,7 +57,11 @@ export function OverviewView({
   findings,
   accountCount,
   onNavigate,
+  users,
 }: OverviewViewProps) {
+  const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
   const criticalFindings = findings.filter((f) => f.priority === 1);
   const openFindings = findings.filter((f) => f.status_name === "Open");
 
@@ -90,6 +97,11 @@ export function OverviewView({
     3: "bg-blue-500",
     4: "bg-emerald-500",
     5: "bg-gray-400",
+  };
+
+  const openFinding = (finding: Finding) => {
+    setSelectedFinding(finding);
+    setDialogOpen(true);
   };
 
   return (
@@ -169,7 +181,8 @@ export function OverviewView({
                   {criticalFindings.slice(0, 10).map((finding) => (
                     <div
                       key={finding.finding_id}
-                      className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-3"
+                      onClick={() => openFinding(finding)}
+                      className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-3 cursor-pointer hover:bg-red-100/80 transition-colors"
                     >
                       <div className="mt-0.5">
                         {getStatusIcon(finding.status_name)}
@@ -190,7 +203,13 @@ export function OverviewView({
                           </span>
                         </div>
                       </div>
-                      <Button variant="ghost" size="icon" asChild className="shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        asChild
+                        className="shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <a
                           href={`https://app.blumira.com/${finding.org_id}/reporting/findings/${finding.finding_id}`}
                           target="_blank"
@@ -310,7 +329,8 @@ export function OverviewView({
               {recentFindings.slice(0, 8).map((finding) => (
                 <div
                   key={finding.finding_id}
-                  className="flex items-center gap-3 rounded-lg border p-3 hover:bg-muted/50 transition-colors"
+                  onClick={() => openFinding(finding)}
+                  className="flex items-center gap-3 rounded-lg border p-3 hover:bg-muted/50 transition-colors cursor-pointer"
                 >
                   {getStatusIcon(finding.status_name)}
                   <div className="flex-1 min-w-0">
@@ -330,7 +350,13 @@ export function OverviewView({
                       {finding.status_name}
                     </Badge>
                   </div>
-                  <Button variant="ghost" size="icon" asChild className="shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    asChild
+                    className="shrink-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <a
                       href={`https://app.blumira.com/${finding.org_id}/reporting/findings/${finding.finding_id}`}
                       target="_blank"
@@ -345,6 +371,13 @@ export function OverviewView({
           )}
         </CardContent>
       </Card>
+
+      <FindingDetailDialog
+        finding={selectedFinding}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        users={users}
+      />
     </div>
   );
 }
