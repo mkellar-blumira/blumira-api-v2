@@ -187,7 +187,6 @@ export function DashboardShell() {
             <FindingsView
               findings={findings}
               searchTerm={searchTerm}
-              onFindingsUpdate={handleRefresh}
             />
           )}
           {activeView === "organizations" && <OrganizationsView />}

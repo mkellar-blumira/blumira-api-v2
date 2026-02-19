@@ -6,12 +6,11 @@ import {
   CheckCircle2,
   XCircle,
   ExternalLink,
-  Clock,
   Filter,
   ChevronDown,
   ChevronUp,
   User,
-  Loader2,
+  StickyNote,
 } from "lucide-react";
 import {
   Card,
@@ -28,12 +27,11 @@ import {
 } from "@/components/ui/select";
 import type { Finding } from "@/lib/blumira-api";
 import { formatDistanceToNow } from "date-fns";
-import { FindingDetailDialog } from "./finding-detail-dialog";
+import { FindingDetailDialog, getAnnotation } from "./finding-detail-dialog";
 
 interface FindingsViewProps {
   findings: Finding[];
   searchTerm: string;
-  onFindingsUpdate?: () => void;
 }
 
 type SortField = "priority" | "created" | "name" | "org_name";
@@ -64,7 +62,7 @@ function getPriorityBadge(priority: number) {
   return <Badge variant={entry.variant}>{entry.label}</Badge>;
 }
 
-export function FindingsView({ findings, searchTerm, onFindingsUpdate }: FindingsViewProps) {
+export function FindingsView({ findings, searchTerm }: FindingsViewProps) {
   const [orgFilter, setOrgFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -73,7 +71,7 @@ export function FindingsView({ findings, searchTerm, onFindingsUpdate }: Finding
   const [showCount, setShowCount] = useState(50);
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [annotationVersion, setAnnotationVersion] = useState(0);
 
   const organizations = useMemo(
     () => [...new Set(findings.map((f) => f.org_name))].sort(),
@@ -156,30 +154,9 @@ export function FindingsView({ findings, searchTerm, onFindingsUpdate }: Finding
     setDialogOpen(true);
   };
 
-  const handleUpdate = useCallback(async (finding: Finding, updates: Record<string, unknown>) => {
-    setUpdatingId(finding.finding_id);
-    try {
-      const res = await fetch("/api/blumira/findings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          accountId: finding.org_id,
-          findingId: finding.finding_id,
-          ...updates,
-        }),
-      });
-
-      const result = await res.json();
-
-      if (!res.ok) {
-        throw new Error(result.error || "Failed to update finding");
-      }
-
-      onFindingsUpdate?.();
-    } finally {
-      setUpdatingId(null);
-    }
-  }, [onFindingsUpdate]);
+  const handleAnnotationChange = useCallback(() => {
+    setAnnotationVersion((v) => v + 1);
+  }, []);
 
   const openCount = findings.filter((f) => f.status_name === "Open").length;
   const criticalCount = findings.filter((f) => f.priority === 1).length;
@@ -295,7 +272,7 @@ export function FindingsView({ findings, searchTerm, onFindingsUpdate }: Finding
             <SortButton field="org_name">Organization</SortButton>
             <SortButton field="priority">Priority</SortButton>
             <span>Status</span>
-            <span>Assignee</span>
+            <span>Tracking</span>
             <SortButton field="created">Created</SortButton>
             <span />
           </div>
@@ -310,49 +287,59 @@ export function FindingsView({ findings, searchTerm, onFindingsUpdate }: Finding
             </div>
           ) : (
             <>
-              {filtered.slice(0, showCount).map((finding) => (
-                <div
-                  key={finding.finding_id}
-                  onClick={() => handleRowClick(finding)}
-                  className="grid grid-cols-[1fr_150px_100px_100px_100px_120px_40px] gap-4 items-center px-4 py-3 border-b last:border-0 hover:bg-blue-50/50 transition-colors cursor-pointer group"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate group-hover:text-blue-700 transition-colors">
-                      {finding.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {finding.type_name}
-                    </p>
-                  </div>
-                  <span className="text-sm truncate">
-                    {finding.org_name}
-                  </span>
-                  <div>{getPriorityBadge(finding.priority)}</div>
-                  <div className="flex items-center gap-1.5">
-                    {getStatusIcon(finding.status_name)}
-                    <span className="text-xs">{finding.status_name}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    {(finding.assigned_to_name || finding.assigned_to) ? (
-                      <>
-                        <User className="h-3 w-3 text-muted-foreground shrink-0" />
-                        <span className="text-xs truncate">
-                          {finding.assigned_to_name || finding.assigned_to}
-                        </span>
-                      </>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(finding.created), {
-                      addSuffix: true,
-                    })}
-                  </span>
-                  <div className="flex items-center">
-                    {updatingId === finding.finding_id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-                    ) : (
+              {filtered.slice(0, showCount).map((finding) => {
+                const annotation = getAnnotation(finding.finding_id);
+                const displayAssignee = annotation?.assignee || finding.assigned_to_name || finding.assigned_to;
+                // eslint-disable-next-line react-hooks/rules-of-hooks -- annotationVersion triggers re-render
+                void annotationVersion;
+
+                return (
+                  <div
+                    key={finding.finding_id}
+                    onClick={() => handleRowClick(finding)}
+                    className="grid grid-cols-[1fr_150px_100px_100px_100px_120px_40px] gap-4 items-center px-4 py-3 border-b last:border-0 hover:bg-blue-50/50 transition-colors cursor-pointer group"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate group-hover:text-blue-700 transition-colors">
+                        {finding.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {finding.type_name}
+                      </p>
+                    </div>
+                    <span className="text-sm truncate">
+                      {finding.org_name}
+                    </span>
+                    <div>{getPriorityBadge(finding.priority)}</div>
+                    <div className="flex items-center gap-1.5">
+                      {getStatusIcon(finding.status_name)}
+                      <span className="text-xs">{finding.status_name}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {displayAssignee ? (
+                        <>
+                          <User className="h-3 w-3 text-muted-foreground shrink-0" />
+                          <span className="text-xs truncate">
+                            {displayAssignee}
+                          </span>
+                        </>
+                      ) : annotation?.notes ? (
+                        <>
+                          <StickyNote className="h-3 w-3 text-blue-500 shrink-0" />
+                          <span className="text-xs text-blue-600 truncate">
+                            Has notes
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(finding.created), {
+                        addSuffix: true,
+                      })}
+                    </span>
+                    <div className="flex items-center">
                       <Button
                         variant="ghost"
                         size="icon"
@@ -368,10 +355,10 @@ export function FindingsView({ findings, searchTerm, onFindingsUpdate }: Finding
                           <ExternalLink className="h-3.5 w-3.5" />
                         </a>
                       </Button>
-                    )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {filtered.length > showCount && (
                 <div className="flex justify-center py-4">
                   <Button
@@ -392,7 +379,7 @@ export function FindingsView({ findings, searchTerm, onFindingsUpdate }: Finding
         finding={selectedFinding}
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        onUpdate={handleUpdate}
+        onAnnotationChange={handleAnnotationChange}
       />
     </div>
   );

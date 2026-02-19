@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,13 +15,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   AlertCircle,
   CheckCircle2,
@@ -40,15 +33,51 @@ import {
   FileText,
   Workflow,
   Eye,
+  Trash2,
+  StickyNote,
 } from "lucide-react";
 import type { Finding } from "@/lib/blumira-api";
 import { formatDistanceToNow, format } from "date-fns";
+
+const STORAGE_KEY = "blumira-finding-annotations";
+
+interface FindingAnnotation {
+  assignee: string;
+  notes: string;
+  updatedAt: string;
+}
+
+function getAnnotations(): Record<string, FindingAnnotation> {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function saveAnnotation(findingId: string, data: FindingAnnotation) {
+  const all = getAnnotations();
+  all[findingId] = data;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+}
+
+function deleteAnnotation(findingId: string) {
+  const all = getAnnotations();
+  delete all[findingId];
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+}
+
+export function getAnnotation(findingId: string): FindingAnnotation | null {
+  const all = getAnnotations();
+  return all[findingId] || null;
+}
 
 interface FindingDetailDialogProps {
   finding: Finding | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onUpdate: (finding: Finding, updates: Record<string, unknown>) => Promise<void>;
+  onAnnotationChange?: () => void;
 }
 
 function getStatusIcon(status: string) {
@@ -62,17 +91,6 @@ function getStatusIcon(status: string) {
     default:
       return <AlertCircle className="h-4 w-4 text-gray-400" />;
   }
-}
-
-function getPriorityLabel(priority: number) {
-  const map: Record<number, string> = {
-    1: "Critical",
-    2: "High",
-    3: "Medium",
-    4: "Low",
-    5: "Info",
-  };
-  return map[priority] || `P${priority}`;
 }
 
 function getPriorityBadge(priority: number) {
@@ -110,26 +128,22 @@ export function FindingDetailDialog({
   finding,
   open,
   onOpenChange,
-  onUpdate,
+  onAnnotationChange,
 }: FindingDetailDialogProps) {
   const [detailData, setDetailData] = useState<Finding | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [assignee, setAssignee] = useState("");
   const [notes, setNotes] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState("");
-  const [selectedPriority, setSelectedPriority] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [existingAnnotation, setExistingAnnotation] = useState<FindingAnnotation | null>(null);
 
   useEffect(() => {
     if (finding && open) {
-      setAssignee(finding.assigned_to || finding.assigned_to_name || "");
-      setNotes(finding.notes || "");
-      setSelectedStatus(finding.status?.toString() || finding.status_name || "");
-      setSelectedPriority(finding.priority?.toString() || "");
-      setSaveError(null);
-      setSaveSuccess(false);
+      const annotation = getAnnotation(finding.finding_id);
+      setExistingAnnotation(annotation);
+      setAssignee(annotation?.assignee || "");
+      setNotes(annotation?.notes || "");
+      setSaved(false);
 
       setLoadingDetail(true);
       fetch(`/api/blumira/findings?accountId=${finding.org_id}&findingId=${finding.finding_id}`)
@@ -137,12 +151,6 @@ export function FindingDetailDialog({
         .then((res) => {
           if (res.data) {
             setDetailData(res.data);
-            if (res.data.assigned_to || res.data.assigned_to_name) {
-              setAssignee(res.data.assigned_to || res.data.assigned_to_name || "");
-            }
-            if (res.data.notes) {
-              setNotes(res.data.notes);
-            }
           }
         })
         .catch(() => {})
@@ -152,83 +160,67 @@ export function FindingDetailDialog({
     }
   }, [finding, open]);
 
+  const hasChanges =
+    assignee !== (existingAnnotation?.assignee || "") ||
+    notes !== (existingAnnotation?.notes || "");
+
+  const handleSave = useCallback(() => {
+    if (!finding) return;
+
+    if (!assignee.trim() && !notes.trim()) {
+      deleteAnnotation(finding.finding_id);
+    } else {
+      saveAnnotation(finding.finding_id, {
+        assignee: assignee.trim(),
+        notes: notes.trim(),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+
+    setExistingAnnotation(
+      assignee.trim() || notes.trim()
+        ? { assignee: assignee.trim(), notes: notes.trim(), updatedAt: new Date().toISOString() }
+        : null
+    );
+    setSaved(true);
+    onAnnotationChange?.();
+    setTimeout(() => setSaved(false), 2000);
+  }, [finding, assignee, notes, onAnnotationChange]);
+
+  const handleClearAnnotation = useCallback(() => {
+    if (!finding) return;
+    deleteAnnotation(finding.finding_id);
+    setAssignee("");
+    setNotes("");
+    setExistingAnnotation(null);
+    onAnnotationChange?.();
+  }, [finding, onAnnotationChange]);
+
   if (!finding) return null;
 
   const detail = detailData || finding;
-
-  const hasChanges =
-    assignee !== (detail.assigned_to || detail.assigned_to_name || "") ||
-    notes !== (detail.notes || "") ||
-    (selectedStatus && selectedStatus !== (detail.status?.toString() || detail.status_name || "")) ||
-    (selectedPriority && selectedPriority !== detail.priority?.toString());
-
-  const handleSave = async () => {
-    if (!finding) return;
-    setSaving(true);
-    setSaveError(null);
-    setSaveSuccess(false);
-
-    try {
-      const updates: Record<string, unknown> = {};
-
-      if (assignee !== (detail.assigned_to || detail.assigned_to_name || "")) {
-        updates.assigned_to = assignee;
-      }
-      if (notes !== (detail.notes || "")) {
-        updates.notes = notes;
-      }
-      if (selectedPriority && selectedPriority !== detail.priority?.toString()) {
-        updates.priority = parseInt(selectedPriority, 10);
-      }
-      if (selectedStatus && selectedStatus !== (detail.status?.toString() || "")) {
-        const statusMap: Record<string, number> = {
-          open: 1,
-          closed: 2,
-          dismissed: 3,
-          in_progress: 4,
-        };
-        const numStatus = parseInt(selectedStatus, 10);
-        if (!isNaN(numStatus)) {
-          updates.status = numStatus;
-        } else if (statusMap[selectedStatus.toLowerCase()]) {
-          updates.status = statusMap[selectedStatus.toLowerCase()];
-        }
-      }
-
-      if (Object.keys(updates).length > 0) {
-        await onUpdate(finding, updates);
-        setSaveSuccess(true);
-        setTimeout(() => setSaveSuccess(false), 3000);
-      }
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Failed to save changes");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const blumiraUrl = `https://app.blumira.com/${finding.org_id}/reporting/findings/${finding.finding_id}`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-1 min-w-0 flex-1">
-              <DialogTitle className="text-lg leading-tight pr-8">
-                {detail.name}
-              </DialogTitle>
-              <DialogDescription className="flex items-center gap-2 flex-wrap">
+          <div className="space-y-1">
+            <DialogTitle className="text-lg leading-tight pr-8">
+              {detail.name}
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
                 {getPriorityBadge(detail.priority)}
                 <Badge variant="outline" className="flex items-center gap-1">
                   {getStatusIcon(detail.status_name)}
                   {detail.status_name}
                 </Badge>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs">
                   ID: {detail.finding_id}
                 </span>
-              </DialogDescription>
-            </div>
+              </div>
+            </DialogDescription>
           </div>
         </DialogHeader>
 
@@ -404,70 +396,47 @@ export function FindingDetailDialog({
             </div>
           )}
 
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <ExternalLink className="h-4 w-4 text-blue-600" />
+              <h4 className="text-sm font-semibold text-blue-900">Manage in Blumira</h4>
+            </div>
+            <p className="text-xs text-blue-700 mb-3">
+              To change status, priority, or resolution, open this finding directly in Blumira.
+            </p>
+            <Button size="sm" asChild>
+              <a href={blumiraUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open in Blumira
+              </a>
+            </Button>
+          </div>
+
           <Separator />
 
           <div className="space-y-4">
-            <h4 className="text-sm font-semibold flex items-center gap-2">
-              <Shield className="h-4 w-4 text-blue-600" />
-              Work This Finding
-            </h4>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="finding-status" className="text-xs font-medium">
-                  Status
-                </Label>
-                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                  <SelectTrigger id="finding-status">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Open">Open</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="closed">Closed</SelectItem>
-                    <SelectItem value="dismissed">Dismissed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="finding-priority" className="text-xs font-medium">
-                  Priority
-                </Label>
-                <Select value={selectedPriority} onValueChange={setSelectedPriority}>
-                  <SelectTrigger id="finding-priority">
-                    <SelectValue placeholder="Select priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">P1 - Critical</SelectItem>
-                    <SelectItem value="2">P2 - High</SelectItem>
-                    <SelectItem value="3">P3 - Medium</SelectItem>
-                    <SelectItem value="4">P4 - Low</SelectItem>
-                    <SelectItem value="5">P5 - Info</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold flex items-center gap-2">
+                <StickyNote className="h-4 w-4 text-blue-600" />
+                Dashboard Notes
+              </h4>
+              <span className="text-xs text-muted-foreground">Stored locally in your browser</span>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="finding-assignee" className="text-xs font-medium">
-                Assign To
+                Assigned To
               </Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="finding-assignee"
-                  placeholder="Enter assignee email or name..."
+                  placeholder="Track who is working this finding..."
                   value={assignee}
                   onChange={(e) => setAssignee(e.target.value)}
                   className="pl-9"
                 />
               </div>
-              {detail.assigned_to_name && detail.assigned_to_name !== assignee && (
-                <p className="text-xs text-muted-foreground">
-                  Currently assigned to: {detail.assigned_to_name}
-                </p>
-              )}
             </div>
 
             <div className="space-y-2">
@@ -482,51 +451,45 @@ export function FindingDetailDialog({
                 rows={3}
               />
             </div>
+
+            {saved && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2">
+                <p className="text-xs text-emerald-700 flex items-center gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Notes saved
+                </p>
+              </div>
+            )}
           </div>
-
-          {saveError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-              <p className="text-sm text-red-700">{saveError}</p>
-            </div>
-          )}
-
-          {saveSuccess && (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-              <p className="text-sm text-emerald-700">Changes saved successfully</p>
-            </div>
-          )}
         </div>
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <a
-              href={blumiraUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+          {existingAnnotation && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              onClick={handleClearAnnotation}
             >
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Open in Blumira
-            </a>
-          </Button>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Clear Notes
+            </Button>
+          )}
           <div className="flex gap-2 ml-auto">
             <Button
               variant="outline"
               size="sm"
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              Close
             </Button>
             <Button
               size="sm"
               onClick={handleSave}
-              disabled={saving || !hasChanges}
+              disabled={!hasChanges}
             >
-              {saving ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4 mr-2" />
-              )}
-              {saving ? "Saving..." : "Save Changes"}
+              <Save className="h-4 w-4 mr-2" />
+              Save Notes
             </Button>
           </div>
         </DialogFooter>

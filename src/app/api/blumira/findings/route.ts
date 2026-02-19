@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   getAccessToken,
-  updateFinding,
   fetchFindingDetail,
 } from "@/lib/blumira-api";
 
@@ -31,29 +30,6 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ data: finding });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "An unknown error occurred";
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
-}
-
-export async function PATCH(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { accountId, findingId, ...updates } = body;
-
-    if (!accountId || !findingId) {
-      return NextResponse.json(
-        { error: "accountId and findingId are required" },
-        { status: 400 }
-      );
-    }
-
-    const token = await getAccessToken();
-    const result = await updateFinding(token, accountId, findingId, updates);
-
-    return NextResponse.json({ data: result });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "An unknown error occurred";
