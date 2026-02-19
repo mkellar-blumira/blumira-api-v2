@@ -7,14 +7,13 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   AlertCircle,
   CheckCircle2,
@@ -25,8 +24,6 @@ import {
   User,
   Shield,
   Loader2,
-  Save,
-  RefreshCw,
   Globe,
   Server,
   Tag,
@@ -35,43 +32,23 @@ import {
   Eye,
   Trash2,
   StickyNote,
+  Send,
+  UserCheck,
+  XSquare,
+  RotateCcw,
 } from "lucide-react";
 import type { Finding, BlumiraUser } from "@/lib/blumira-api";
+import {
+  getAnnotation,
+  addNote,
+  setAssignee as storeAssignee,
+  setLocalStatus,
+  deleteAnnotation,
+  type FindingAnnotation,
+} from "@/lib/annotations";
 import { formatDistanceToNow, format } from "date-fns";
 
-const STORAGE_KEY = "blumira-finding-annotations";
-
-interface FindingAnnotation {
-  assignee: string;
-  notes: string;
-  updatedAt: string;
-}
-
-function getAnnotations(): Record<string, FindingAnnotation> {
-  if (typeof window === "undefined") return {};
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-  } catch {
-    return {};
-  }
-}
-
-function saveAnnotation(findingId: string, data: FindingAnnotation) {
-  const all = getAnnotations();
-  all[findingId] = data;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
-}
-
-function deleteAnnotation(findingId: string) {
-  const all = getAnnotations();
-  delete all[findingId];
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
-}
-
-export function getAnnotation(findingId: string): FindingAnnotation | null {
-  const all = getAnnotations();
-  return all[findingId] || null;
-}
+export { getAnnotation } from "@/lib/annotations";
 
 interface FindingDetailDialogProps {
   finding: Finding | null;
@@ -91,10 +68,12 @@ function UserSelector({
   users,
   value,
   onChange,
+  placeholder,
 }: {
   users: BlumiraUser[];
   value: string;
   onChange: (value: string) => void;
+  placeholder?: string;
 }) {
   const [search, setSearch] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
@@ -107,33 +86,25 @@ function UserSelector({
   });
 
   const handleSelect = (user: BlumiraUser) => {
-    const display = getUserDisplayName(user);
-    onChange(display);
+    onChange(getUserDisplayName(user));
     setSearch("");
     setShowDropdown(false);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setSearch(val);
-    onChange(val);
-    setShowDropdown(true);
   };
 
   return (
     <div className="relative">
       <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
       <Input
-        placeholder={users.length > 0 ? "Search users or type a name..." : "Type an assignee name..."}
+        placeholder={placeholder || (users.length > 0 ? "Search users or type a name..." : "Type a name...")}
         value={value}
-        onChange={handleInputChange}
+        onChange={(e) => { setSearch(e.target.value); onChange(e.target.value); setShowDropdown(true); }}
         onFocus={() => setShowDropdown(true)}
         onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
         className="pl-9"
       />
       {showDropdown && filtered.length > 0 && (
         <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto rounded-md border bg-popover shadow-md">
-          {filtered.slice(0, 20).map((user) => {
+          {filtered.slice(0, 15).map((user) => {
             const name = getUserDisplayName(user);
             return (
               <button
@@ -152,33 +123,25 @@ function UserSelector({
                     <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                   )}
                 </div>
-                {user.org_name && (
-                  <span className="text-xs text-muted-foreground shrink-0">{user.org_name}</span>
-                )}
               </button>
             );
           })}
-          {filtered.length > 20 && (
-            <p className="px-3 py-2 text-xs text-muted-foreground text-center">
-              {filtered.length - 20} more users — refine your search
-            </p>
-          )}
         </div>
       )}
     </div>
   );
 }
 
-function getStatusIcon(status: string) {
+function getStatusIcon(status: string, size = "h-4 w-4") {
   switch (status.toLowerCase()) {
     case "open":
-      return <AlertCircle className="h-4 w-4 text-red-500" />;
+      return <AlertCircle className={`${size} text-red-500`} />;
     case "closed":
-      return <CheckCircle2 className="h-4 w-4 text-emerald-500" />;
+      return <CheckCircle2 className={`${size} text-emerald-500`} />;
     case "dismissed":
-      return <XCircle className="h-4 w-4 text-gray-400" />;
+      return <XCircle className={`${size} text-gray-400`} />;
     default:
-      return <AlertCircle className="h-4 w-4 text-gray-400" />;
+      return <AlertCircle className={`${size} text-gray-400`} />;
   }
 }
 
@@ -194,13 +157,7 @@ function getPriorityBadge(priority: number) {
   return <Badge variant={entry.variant}>{entry.label}</Badge>;
 }
 
-interface DetailRowProps {
-  icon: React.ReactNode;
-  label: string;
-  value: React.ReactNode;
-}
-
-function DetailRow({ icon, label, value }: DetailRowProps) {
+function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
   if (!value) return null;
   return (
     <div className="flex items-start gap-3 py-2">
@@ -222,27 +179,29 @@ export function FindingDetailDialog({
 }: FindingDetailDialogProps) {
   const [detailData, setDetailData] = useState<Finding | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [assignee, setAssignee] = useState("");
-  const [notes, setNotes] = useState("");
-  const [saved, setSaved] = useState(false);
-  const [existingAnnotation, setExistingAnnotation] = useState<FindingAnnotation | null>(null);
+  const [annotation, setAnnotation] = useState<FindingAnnotation | null>(null);
+  const [newNote, setNewNote] = useState("");
+  const [assigneeInput, setAssigneeInput] = useState("");
+  const [showAssignee, setShowAssignee] = useState(false);
+
+  const reload = useCallback(() => {
+    if (!finding) return;
+    setAnnotation(getAnnotation(finding.finding_id));
+    onAnnotationChange?.();
+  }, [finding, onAnnotationChange]);
 
   useEffect(() => {
     if (finding && open) {
-      const annotation = getAnnotation(finding.finding_id);
-      setExistingAnnotation(annotation);
-      setAssignee(annotation?.assignee || "");
-      setNotes(annotation?.notes || "");
-      setSaved(false);
+      const a = getAnnotation(finding.finding_id);
+      setAnnotation(a);
+      setAssigneeInput(a?.assignee || "");
+      setNewNote("");
+      setShowAssignee(false);
 
       setLoadingDetail(true);
       fetch(`/api/blumira/findings?accountId=${finding.org_id}&findingId=${finding.finding_id}`)
         .then((r) => r.json())
-        .then((res) => {
-          if (res.data) {
-            setDetailData(res.data);
-          }
-        })
+        .then((res) => { if (res.data) setDetailData(res.data); })
         .catch(() => {})
         .finally(() => setLoadingDetail(false));
     } else {
@@ -250,39 +209,48 @@ export function FindingDetailDialog({
     }
   }, [finding, open]);
 
-  const hasChanges =
-    assignee !== (existingAnnotation?.assignee || "") ||
-    notes !== (existingAnnotation?.notes || "");
-
-  const handleSave = useCallback(() => {
-    if (!finding) return;
-
-    if (!assignee.trim() && !notes.trim()) {
-      deleteAnnotation(finding.finding_id);
-    } else {
-      saveAnnotation(finding.finding_id, {
-        assignee: assignee.trim(),
-        notes: notes.trim(),
-        updatedAt: new Date().toISOString(),
-      });
-    }
-
-    setExistingAnnotation(
-      assignee.trim() || notes.trim()
-        ? { assignee: assignee.trim(), notes: notes.trim(), updatedAt: new Date().toISOString() }
-        : null
-    );
-    setSaved(true);
+  const handleAddNote = useCallback(() => {
+    if (!finding || !newNote.trim()) return;
+    const updated = addNote(finding.finding_id, newNote.trim(), "You");
+    setAnnotation(updated);
+    setNewNote("");
     onAnnotationChange?.();
-    setTimeout(() => setSaved(false), 2000);
-  }, [finding, assignee, notes, onAnnotationChange]);
+  }, [finding, newNote, onAnnotationChange]);
 
-  const handleClearAnnotation = useCallback(() => {
+  const handleTakeOwnership = useCallback(() => {
+    if (!finding) return;
+    setShowAssignee(true);
+  }, [finding]);
+
+  const handleSaveAssignee = useCallback(() => {
+    if (!finding) return;
+    const updated = storeAssignee(finding.finding_id, assigneeInput.trim());
+    setAnnotation(updated);
+    setShowAssignee(false);
+    onAnnotationChange?.();
+  }, [finding, assigneeInput, onAnnotationChange]);
+
+  const handleClose = useCallback(() => {
+    if (!finding) return;
+    const updated = setLocalStatus(finding.finding_id, "closed");
+    addNote(finding.finding_id, "Marked as closed from dashboard", "System");
+    setAnnotation(getAnnotation(finding.finding_id));
+    onAnnotationChange?.();
+  }, [finding, onAnnotationChange]);
+
+  const handleReopen = useCallback(() => {
+    if (!finding) return;
+    setLocalStatus(finding.finding_id, "none");
+    addNote(finding.finding_id, "Reopened from dashboard", "System");
+    setAnnotation(getAnnotation(finding.finding_id));
+    onAnnotationChange?.();
+  }, [finding, onAnnotationChange]);
+
+  const handleClearAll = useCallback(() => {
     if (!finding) return;
     deleteAnnotation(finding.finding_id);
-    setAssignee("");
-    setNotes("");
-    setExistingAnnotation(null);
+    setAnnotation(null);
+    setAssigneeInput("");
     onAnnotationChange?.();
   }, [finding, onAnnotationChange]);
 
@@ -290,12 +258,13 @@ export function FindingDetailDialog({
 
   const detail = detailData || finding;
   const blumiraUrl = `https://app.blumira.com/${finding.org_id}/reporting/findings/${finding.finding_id}`;
+  const isClosed = annotation?.localStatus === "closed";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <div className="space-y-1">
+          <div className="space-y-2">
             <DialogTitle className="text-lg leading-tight pr-8">
               {detail.name}
             </DialogTitle>
@@ -306,283 +275,185 @@ export function FindingDetailDialog({
                   {getStatusIcon(detail.status_name)}
                   {detail.status_name}
                 </Badge>
-                <span className="text-xs">
-                  ID: {detail.finding_id}
-                </span>
+                {isClosed && (
+                  <Badge variant="success" className="flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Closed locally
+                  </Badge>
+                )}
+                {annotation?.assignee && (
+                  <Badge variant="info" className="flex items-center gap-1">
+                    <User className="h-3 w-3" />
+                    {annotation.assignee}
+                  </Badge>
+                )}
               </div>
             </DialogDescription>
           </div>
         </DialogHeader>
 
-        {loadingDetail && (
-          <div className="flex items-center justify-center py-4">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            <span className="ml-2 text-sm text-muted-foreground">Loading details...</span>
+        <div className="flex gap-2 flex-wrap">
+          <Button size="sm" variant="outline" onClick={handleTakeOwnership}>
+            <UserCheck className="h-3.5 w-3.5 mr-1.5" />
+            {annotation?.assignee ? "Reassign" : "Take Ownership"}
+          </Button>
+          {!isClosed ? (
+            <Button size="sm" variant="outline" onClick={handleClose}>
+              <XSquare className="h-3.5 w-3.5 mr-1.5" />
+              Close Finding
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline" onClick={handleReopen}>
+              <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+              Reopen
+            </Button>
+          )}
+          <Button size="sm" variant="outline" asChild>
+            <a href={blumiraUrl} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+              Open in Blumira
+            </a>
+          </Button>
+          {annotation && (
+            <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700 hover:bg-red-50 ml-auto" onClick={handleClearAll}>
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              Clear All
+            </Button>
+          )}
+        </div>
+
+        {showAssignee && (
+          <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+            <p className="text-xs font-medium">Assign this finding to:</p>
+            <UserSelector users={users} value={assigneeInput} onChange={setAssigneeInput} placeholder="Select or type assignee..." />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleSaveAssignee} disabled={!assigneeInput.trim()}>
+                <UserCheck className="h-3.5 w-3.5 mr-1.5" />
+                Assign
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setShowAssignee(false)}>Cancel</Button>
+            </div>
           </div>
         )}
 
-        <div className="space-y-4">
-          <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
-            <DetailRow
-              icon={<Building2 className="h-4 w-4" />}
-              label="Organization"
-              value={detail.org_name}
-            />
-            <DetailRow
-              icon={<Tag className="h-4 w-4" />}
-              label="Type"
-              value={detail.type_name}
-            />
-            {detail.category && (
-              <DetailRow
-                icon={<Tag className="h-4 w-4" />}
-                label="Category"
-                value={
-                  <span>
-                    {detail.category}
-                    {detail.subcategory && ` / ${detail.subcategory}`}
-                  </span>
-                }
-              />
-            )}
-            {detail.source && (
-              <DetailRow
-                icon={<Eye className="h-4 w-4" />}
-                label="Source"
-                value={detail.source}
-              />
-            )}
-            <DetailRow
-              icon={<Clock className="h-4 w-4" />}
-              label="Created"
-              value={
-                <span>
-                  {format(new Date(detail.created), "MMM d, yyyy 'at' h:mm a")}
-                  <span className="text-muted-foreground ml-2">
-                    ({formatDistanceToNow(new Date(detail.created), { addSuffix: true })})
-                  </span>
-                </span>
-              }
-            />
-            <DetailRow
-              icon={<RefreshCw className="h-4 w-4" />}
-              label="Last Modified"
-              value={
-                detail.modified ? (
-                  <span>
-                    {format(new Date(detail.modified), "MMM d, yyyy 'at' h:mm a")}
-                    <span className="text-muted-foreground ml-2">
-                      ({formatDistanceToNow(new Date(detail.modified), { addSuffix: true })})
-                    </span>
-                  </span>
-                ) : null
-              }
-            />
-            {detail.resolution_name && (
-              <DetailRow
-                icon={<CheckCircle2 className="h-4 w-4" />}
-                label="Resolution"
-                value={detail.resolution_name}
-              />
-            )}
-          </div>
-
-          {(detail.description || detail.summary || detail.evidence) && (
-            <div className="space-y-3">
-              {detail.summary && (
-                <div>
-                  <h4 className="text-sm font-semibold mb-1 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    Summary
-                  </h4>
-                  <p className="text-sm text-muted-foreground leading-relaxed bg-muted/30 rounded-lg p-3">
-                    {detail.summary}
-                  </p>
-                </div>
-              )}
-              {detail.description && (
-                <div>
-                  <h4 className="text-sm font-semibold mb-1 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground" />
-                    Description
-                  </h4>
-                  <p className="text-sm text-muted-foreground leading-relaxed bg-muted/30 rounded-lg p-3 whitespace-pre-wrap">
-                    {detail.description}
-                  </p>
-                </div>
-              )}
-              {detail.evidence && (
-                <div>
-                  <h4 className="text-sm font-semibold mb-1 flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-muted-foreground" />
-                    Evidence
-                  </h4>
-                  <pre className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap font-mono">
-                    {detail.evidence}
-                  </pre>
-                </div>
-              )}
-            </div>
-          )}
-
-          {(detail.ip_address || detail.hostname || detail.url || detail.user || detail.workflow_name || detail.rule_name || detail.detector_name) && (
-            <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                Technical Details
-              </h4>
-              {detail.ip_address && (
-                <DetailRow
-                  icon={<Globe className="h-4 w-4" />}
-                  label="IP Address"
-                  value={<code className="text-xs bg-muted rounded px-1.5 py-0.5">{detail.ip_address}</code>}
-                />
-              )}
-              {detail.hostname && (
-                <DetailRow
-                  icon={<Server className="h-4 w-4" />}
-                  label="Hostname"
-                  value={<code className="text-xs bg-muted rounded px-1.5 py-0.5">{detail.hostname}</code>}
-                />
-              )}
-              {detail.url && (
-                <DetailRow
-                  icon={<Globe className="h-4 w-4" />}
-                  label="URL"
-                  value={
-                    <a href={detail.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all text-xs">
-                      {detail.url}
-                    </a>
-                  }
-                />
-              )}
-              {detail.user && (
-                <DetailRow
-                  icon={<User className="h-4 w-4" />}
-                  label="User"
-                  value={detail.user}
-                />
-              )}
-              {detail.workflow_name && (
-                <DetailRow
-                  icon={<Workflow className="h-4 w-4" />}
-                  label="Workflow"
-                  value={detail.workflow_name}
-                />
-              )}
-              {detail.rule_name && (
-                <DetailRow
-                  icon={<Shield className="h-4 w-4" />}
-                  label="Rule"
-                  value={detail.rule_name}
-                />
-              )}
-              {detail.detector_name && (
-                <DetailRow
-                  icon={<Eye className="h-4 w-4" />}
-                  label="Detector"
-                  value={detail.detector_name}
-                />
-              )}
-            </div>
-          )}
-
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <ExternalLink className="h-4 w-4 text-blue-600" />
-              <h4 className="text-sm font-semibold text-blue-900">Manage in Blumira</h4>
-            </div>
-            <p className="text-xs text-blue-700 mb-3">
-              To change status, priority, or resolution, open this finding directly in Blumira.
-            </p>
-            <Button size="sm" asChild>
-              <a href={blumiraUrl} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Open in Blumira
-              </a>
-            </Button>
-          </div>
-
-          <Separator />
-
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-semibold flex items-center gap-2">
-                <StickyNote className="h-4 w-4 text-blue-600" />
-                Dashboard Notes
-              </h4>
-              <span className="text-xs text-muted-foreground">Stored locally in your browser</span>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-xs font-medium">
-                Assigned To
-              </Label>
-              <UserSelector
-                users={users}
-                value={assignee}
-                onChange={setAssignee}
-              />
-              {users.length === 0 && (
-                <p className="text-xs text-muted-foreground">
-                  No users loaded from API — type a name manually
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="finding-notes" className="text-xs font-medium">
-                Notes
-              </Label>
-              <Textarea
-                id="finding-notes"
-                placeholder="Add investigation notes, remediation steps, or comments..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-              />
-            </div>
-
-            {saved && (
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2">
-                <p className="text-xs text-emerald-700 flex items-center gap-1.5">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  Notes saved
-                </p>
+        <ScrollArea className="flex-1 -mx-6 px-6">
+          <div className="space-y-4 pb-4">
+            {loadingDetail && (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-sm text-muted-foreground">Loading details...</span>
               </div>
             )}
-          </div>
-        </div>
 
-        <DialogFooter className="flex-col sm:flex-row gap-2">
-          {existingAnnotation && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-              onClick={handleClearAnnotation}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Clear Notes
-            </Button>
-          )}
-          <div className="flex gap-2 ml-auto">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onOpenChange(false)}
-            >
-              Close
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleSave}
-              disabled={!hasChanges}
-            >
-              <Save className="h-4 w-4 mr-2" />
-              Save Notes
-            </Button>
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
+              <DetailRow icon={<Building2 className="h-4 w-4" />} label="Organization" value={detail.org_name} />
+              <DetailRow icon={<Tag className="h-4 w-4" />} label="Type" value={detail.type_name} />
+              {detail.category && (
+                <DetailRow icon={<Tag className="h-4 w-4" />} label="Category"
+                  value={<span>{detail.category}{detail.subcategory && ` / ${detail.subcategory}`}</span>} />
+              )}
+              {detail.source && <DetailRow icon={<Eye className="h-4 w-4" />} label="Source" value={detail.source} />}
+              <DetailRow icon={<Clock className="h-4 w-4" />} label="Created"
+                value={
+                  <span>
+                    {format(new Date(detail.created), "MMM d, yyyy 'at' h:mm a")}
+                    <span className="text-muted-foreground ml-2">({formatDistanceToNow(new Date(detail.created), { addSuffix: true })})</span>
+                  </span>
+                } />
+              {detail.modified && (
+                <DetailRow icon={<Clock className="h-4 w-4" />} label="Modified"
+                  value={<span>{format(new Date(detail.modified), "MMM d, yyyy 'at' h:mm a")}</span>} />
+              )}
+              {detail.resolution_name && <DetailRow icon={<CheckCircle2 className="h-4 w-4" />} label="Resolution" value={detail.resolution_name} />}
+            </div>
+
+            {(detail.description || detail.summary || detail.evidence) && (
+              <div className="space-y-3">
+                {detail.summary && (
+                  <div>
+                    <h4 className="text-sm font-semibold mb-1 flex items-center gap-2"><FileText className="h-4 w-4 text-muted-foreground" />Summary</h4>
+                    <p className="text-sm text-muted-foreground leading-relaxed bg-muted/30 rounded-lg p-3">{detail.summary}</p>
+                  </div>
+                )}
+                {detail.description && (
+                  <div>
+                    <h4 className="text-sm font-semibold mb-1 flex items-center gap-2"><FileText className="h-4 w-4 text-muted-foreground" />Description</h4>
+                    <p className="text-sm text-muted-foreground leading-relaxed bg-muted/30 rounded-lg p-3 whitespace-pre-wrap">{detail.description}</p>
+                  </div>
+                )}
+                {detail.evidence && (
+                  <div>
+                    <h4 className="text-sm font-semibold mb-1 flex items-center gap-2"><Shield className="h-4 w-4 text-muted-foreground" />Evidence</h4>
+                    <pre className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap font-mono">{detail.evidence}</pre>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {(detail.ip_address || detail.hostname || detail.url || detail.user || detail.workflow_name || detail.rule_name || detail.detector_name) && (
+              <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Technical Details</h4>
+                {detail.ip_address && <DetailRow icon={<Globe className="h-4 w-4" />} label="IP Address" value={<code className="text-xs bg-muted rounded px-1.5 py-0.5">{detail.ip_address}</code>} />}
+                {detail.hostname && <DetailRow icon={<Server className="h-4 w-4" />} label="Hostname" value={<code className="text-xs bg-muted rounded px-1.5 py-0.5">{detail.hostname}</code>} />}
+                {detail.url && <DetailRow icon={<Globe className="h-4 w-4" />} label="URL" value={<a href={detail.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all text-xs">{detail.url}</a>} />}
+                {detail.user && <DetailRow icon={<User className="h-4 w-4" />} label="User" value={detail.user} />}
+                {detail.workflow_name && <DetailRow icon={<Workflow className="h-4 w-4" />} label="Workflow" value={detail.workflow_name} />}
+                {detail.rule_name && <DetailRow icon={<Shield className="h-4 w-4" />} label="Rule" value={detail.rule_name} />}
+                {detail.detector_name && <DetailRow icon={<Eye className="h-4 w-4" />} label="Detector" value={detail.detector_name} />}
+              </div>
+            )}
+
+            <Separator />
+
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold flex items-center gap-2">
+                <StickyNote className="h-4 w-4 text-blue-600" />
+                Notes
+                {annotation?.notes && annotation.notes.length > 0 && (
+                  <Badge variant="secondary" className="text-[10px]">{annotation.notes.length}</Badge>
+                )}
+              </h4>
+
+              {annotation?.notes && annotation.notes.length > 0 ? (
+                <div className="space-y-2">
+                  {[...annotation.notes].reverse().map((note, i) => (
+                    <div key={i} className={`rounded-lg border p-3 text-sm ${note.author === "System" ? "bg-muted/20 border-dashed" : "bg-muted/30"}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium">{note.author}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDistanceToNow(new Date(note.timestamp), { addSuffix: true })}
+                        </span>
+                      </div>
+                      <p className="text-sm whitespace-pre-wrap">{note.text}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground py-2">No notes yet. Add one below.</p>
+              )}
+
+              <div className="flex gap-2">
+                <Textarea
+                  placeholder="Add a note..."
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  rows={2}
+                  className="flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      handleAddNote();
+                    }
+                  }}
+                />
+                <Button size="sm" className="self-end" onClick={handleAddNote} disabled={!newNote.trim()}>
+                  <Send className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Press Ctrl+Enter to send. Notes are stored locally in your browser.</p>
+            </div>
           </div>
-        </DialogFooter>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
