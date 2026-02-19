@@ -45,17 +45,15 @@ export function DashboardShell() {
       const result = await res.json();
 
       if (!res.ok) {
-        if (
-          result.error?.includes("BLUMIRA_CLIENT_ID") ||
-          result.error?.includes("BLUMIRA_CLIENT_SECRET") ||
-          result.error?.includes("Authentication failed")
-        ) {
-          setCredentialsMissing(true);
-        }
         throw new Error(result.error || "Failed to fetch dashboard data");
       }
 
-      setData(result);
+      if (result.requiresAuth || result.authError) {
+        setCredentialsMissing(true);
+        setData(result);
+      } else {
+        setData(result);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {

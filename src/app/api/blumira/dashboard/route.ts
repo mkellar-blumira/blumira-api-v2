@@ -10,6 +10,19 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const hasClientId = !!process.env.BLUMIRA_CLIENT_ID;
+  const hasClientSecret = !!process.env.BLUMIRA_CLIENT_SECRET;
+
+  if (!hasClientId || !hasClientSecret) {
+    return NextResponse.json({
+      accounts: [],
+      findings: [],
+      users: [],
+      requiresAuth: true,
+      meta: { accountsCount: 0, findingsCount: 0, usersCount: 0, timestamp: new Date().toISOString() },
+    });
+  }
+
   try {
     const token = await getAccessToken();
 
@@ -64,12 +77,19 @@ export async function GET() {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "An unknown error occurred";
+
+    if (message.includes("Authentication failed")) {
+      return NextResponse.json({
+        accounts: [],
+        findings: [],
+        users: [],
+        authError: message,
+        meta: { accountsCount: 0, findingsCount: 0, usersCount: 0, timestamp: new Date().toISOString() },
+      });
+    }
+
     return NextResponse.json(
-      {
-        error: message,
-        hasClientId: !!process.env.BLUMIRA_CLIENT_ID,
-        hasClientSecret: !!process.env.BLUMIRA_CLIENT_SECRET,
-      },
+      { error: message },
       { status: 500 }
     );
   }
