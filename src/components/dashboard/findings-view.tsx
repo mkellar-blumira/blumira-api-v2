@@ -25,13 +25,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Finding } from "@/lib/blumira-api";
+import type { Finding, BlumiraUser } from "@/lib/blumira-api";
 import { formatDistanceToNow } from "date-fns";
 import { FindingDetailDialog, getAnnotation } from "./finding-detail-dialog";
 
 interface FindingsViewProps {
   findings: Finding[];
   searchTerm: string;
+  users: BlumiraUser[];
 }
 
 type SortField = "priority" | "created" | "name" | "org_name";
@@ -62,7 +63,7 @@ function getPriorityBadge(priority: number) {
   return <Badge variant={entry.variant}>{entry.label}</Badge>;
 }
 
-export function FindingsView({ findings, searchTerm }: FindingsViewProps) {
+export function FindingsView({ findings, searchTerm, users }: FindingsViewProps) {
   const [orgFilter, setOrgFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -380,6 +381,7 @@ export function FindingsView({ findings, searchTerm }: FindingsViewProps) {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onAnnotationChange={handleAnnotationChange}
+        users={users}
       />
     </div>
   );

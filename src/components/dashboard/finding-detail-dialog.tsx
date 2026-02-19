@@ -36,7 +36,7 @@ import {
   Trash2,
   StickyNote,
 } from "lucide-react";
-import type { Finding } from "@/lib/blumira-api";
+import type { Finding, BlumiraUser } from "@/lib/blumira-api";
 import { formatDistanceToNow, format } from "date-fns";
 
 const STORAGE_KEY = "blumira-finding-annotations";
@@ -78,6 +78,95 @@ interface FindingDetailDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAnnotationChange?: () => void;
+  users: BlumiraUser[];
+}
+
+function getUserDisplayName(user: BlumiraUser): string {
+  if (user.name) return user.name;
+  const full = `${user.first_name || ""} ${user.last_name || ""}`.trim();
+  return full || user.email;
+}
+
+function UserSelector({
+  users,
+  value,
+  onChange,
+}: {
+  users: BlumiraUser[];
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const filtered = users.filter((u) => {
+    if (!search) return true;
+    const term = search.toLowerCase();
+    const name = getUserDisplayName(u).toLowerCase();
+    return name.includes(term) || u.email.toLowerCase().includes(term);
+  });
+
+  const handleSelect = (user: BlumiraUser) => {
+    const display = getUserDisplayName(user);
+    onChange(display);
+    setSearch("");
+    setShowDropdown(false);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setSearch(val);
+    onChange(val);
+    setShowDropdown(true);
+  };
+
+  return (
+    <div className="relative">
+      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground z-10" />
+      <Input
+        placeholder={users.length > 0 ? "Search users or type a name..." : "Type an assignee name..."}
+        value={value}
+        onChange={handleInputChange}
+        onFocus={() => setShowDropdown(true)}
+        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+        className="pl-9"
+      />
+      {showDropdown && filtered.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto rounded-md border bg-popover shadow-md">
+          {filtered.slice(0, 20).map((user) => {
+            const name = getUserDisplayName(user);
+            return (
+              <button
+                key={user.user_id || user.email}
+                type="button"
+                className="flex items-center gap-2 w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleSelect(user)}
+              >
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-medium shrink-0">
+                  {name.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium truncate">{name}</p>
+                  {name !== user.email && (
+                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                  )}
+                </div>
+                {user.org_name && (
+                  <span className="text-xs text-muted-foreground shrink-0">{user.org_name}</span>
+                )}
+              </button>
+            );
+          })}
+          {filtered.length > 20 && (
+            <p className="px-3 py-2 text-xs text-muted-foreground text-center">
+              {filtered.length - 20} more users — refine your search
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function getStatusIcon(status: string) {
@@ -129,6 +218,7 @@ export function FindingDetailDialog({
   open,
   onOpenChange,
   onAnnotationChange,
+  users,
 }: FindingDetailDialogProps) {
   const [detailData, setDetailData] = useState<Finding | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -424,19 +514,19 @@ export function FindingDetailDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="finding-assignee" className="text-xs font-medium">
+              <Label className="text-xs font-medium">
                 Assigned To
               </Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="finding-assignee"
-                  placeholder="Track who is working this finding..."
-                  value={assignee}
-                  onChange={(e) => setAssignee(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
+              <UserSelector
+                users={users}
+                value={assignee}
+                onChange={setAssignee}
+              />
+              {users.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No users loaded from API — type a name manually
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">

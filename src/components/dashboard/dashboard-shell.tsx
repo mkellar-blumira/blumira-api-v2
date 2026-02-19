@@ -18,11 +18,12 @@ import {
   Settings,
   RefreshCw,
 } from "lucide-react";
-import type { Finding, MspAccount } from "@/lib/blumira-api";
+import type { Finding, MspAccount, BlumiraUser } from "@/lib/blumira-api";
 
 interface DashboardData {
   accounts: MspAccount[];
   findings: Finding[];
+  users: BlumiraUser[];
   meta?: { timestamp: string };
 }
 
@@ -187,6 +188,7 @@ export function DashboardShell() {
             <FindingsView
               findings={findings}
               searchTerm={searchTerm}
+              users={data?.users || []}
             />
           )}
           {activeView === "organizations" && <OrganizationsView />}

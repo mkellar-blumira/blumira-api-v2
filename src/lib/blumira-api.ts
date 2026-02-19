@@ -139,6 +139,19 @@ export interface AgentKey {
   created_at?: string;
 }
 
+export interface BlumiraUser {
+  user_id: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  name?: string;
+  role?: string;
+  status?: string;
+  org_id?: string;
+  org_name?: string;
+  created?: string;
+}
+
 interface ApiResponse<T> {
   status?: string;
   data?: T;
@@ -221,6 +234,21 @@ export async function fetchAccountAgentKeys(
   try {
     const res = await apiGet<ApiResponse<AgentKey[]>>(
       `/msp/accounts/${accountId}/agents/keys`,
+      token
+    );
+    return res.data || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchAccountUsers(
+  token: string,
+  accountId: string
+): Promise<BlumiraUser[]> {
+  try {
+    const res = await apiGet<ApiResponse<BlumiraUser[]>>(
+      `/msp/accounts/${accountId}/users`,
       token
     );
     return res.data || [];
