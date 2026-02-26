@@ -12,6 +12,11 @@ import {
   RefreshCw,
   Trash2,
   Info,
+  Brain,
+  Sparkles,
+  MessageSquare,
+  CheckSquare,
+  Plug,
 } from "lucide-react";
 import {
   Card,
@@ -286,6 +291,95 @@ export function SettingsView() {
         </CardContent>
       </Card>
 
+      <Card className="border-purple-500/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Brain className="h-4 w-4 text-purple-500" />
+            MCP Integration
+            <Badge variant="info" className="text-[10px] gap-1">
+              <Sparkles className="h-2.5 w-2.5" />
+              Active
+            </Badge>
+          </CardTitle>
+          <CardDescription>
+            Blumira MCP server capabilities integrated into the dashboard
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            This dashboard integrates concepts from the{" "}
+            <a
+              href="https://gitlab.com/mkellar/blumira-mcp"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-purple-400 hover:text-purple-300 underline"
+            >
+              Blumira MCP Server
+            </a>{" "}
+            to provide intelligent analysis of security findings directly
+            within the dashboard UI. The MCP server exposes 27 tools for
+            querying and acting on Blumira security data.
+          </p>
+
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-foreground">Integrated Capabilities:</p>
+            <div className="grid gap-2">
+              <div className="flex items-start gap-3 p-3 rounded-lg border bg-muted/20">
+                <MessageSquare className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium">Investigation Comments</p>
+                  <p className="text-xs text-muted-foreground">
+                    View and add analyst notes from the finding&apos;s collaboration thread in Blumira
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 rounded-lg border bg-muted/20">
+                <CheckSquare className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium">Finding Resolution</p>
+                  <p className="text-xs text-muted-foreground">
+                    Resolve findings directly (Valid, False Positive, No Action Needed, Risk Accepted)
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 rounded-lg border bg-muted/20">
+                <Sparkles className="h-4 w-4 text-purple-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium">Executive Summaries</p>
+                  <p className="text-xs text-muted-foreground">
+                    Display Blumira&apos;s pre-computed finding analysis and executive summaries
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-foreground flex items-center gap-2">
+              <Plug className="h-3.5 w-3.5" />
+              MCP Server Setup (Optional)
+            </p>
+            <p className="text-xs text-muted-foreground">
+              For AI-assisted analysis in tools like Cursor or Claude Desktop,
+              you can also run the standalone MCP server:
+            </p>
+            <div className="bg-muted/30 rounded-lg p-3 font-mono text-xs space-y-1 overflow-x-auto">
+              <p className="text-muted-foreground"># Clone and build the MCP server</p>
+              <p>git clone https://gitlab.com/mkellar/blumira-mcp.git</p>
+              <p>cd blumira-mcp && npm install && npm run build</p>
+              <p className="text-muted-foreground mt-2"># Configure in .cursor/mcp.json</p>
+              <p>{`{ "mcpServers": { "blumira": {`}</p>
+              <p>{`    "command": "node",`}</p>
+              <p>{`    "args": ["dist/index.js"],`}</p>
+              <p>{`    "env": { "BLUMIRA_ACCESS_TOKEN": "..." }`}</p>
+              <p>{`} } }`}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -296,7 +390,8 @@ export function SettingsView() {
         <CardContent className="text-sm text-muted-foreground space-y-3">
           <p>
             This MSP Dashboard demonstrates what&apos;s possible using the Blumira
-            Public API for Managed Service Providers. It provides a unified
+            Public API for Managed Service Providers, combined with MCP server
+            concepts for intelligent finding analysis. It provides a unified
             view of security findings, agent devices, and organization
             management across all your MSP client accounts.
           </p>
@@ -323,9 +418,27 @@ export function SettingsView() {
               </li>
               <li>
                 <code className="text-xs bg-muted px-1 rounded">
-                  GET /msp/accounts/:id/findings
+                  GET /msp/accounts/:id/findings/:id
                 </code>{" "}
-                &mdash; Findings per account
+                &mdash; Individual finding detail
+              </li>
+              <li>
+                <code className="text-xs bg-muted px-1 rounded">
+                  GET /msp/accounts/:id/findings/:id/comments
+                </code>{" "}
+                &mdash; Finding investigation comments
+              </li>
+              <li>
+                <code className="text-xs bg-muted px-1 rounded">
+                  POST /msp/accounts/:id/findings/:id/comments
+                </code>{" "}
+                &mdash; Add comment to finding
+              </li>
+              <li>
+                <code className="text-xs bg-muted px-1 rounded">
+                  POST /msp/accounts/:id/findings/:id/resolve
+                </code>{" "}
+                &mdash; Resolve a finding
               </li>
               <li>
                 <code className="text-xs bg-muted px-1 rounded">
@@ -339,6 +452,12 @@ export function SettingsView() {
                 </code>{" "}
                 &mdash; Agent deployment keys
               </li>
+              <li>
+                <code className="text-xs bg-muted px-1 rounded">
+                  GET /resolutions
+                </code>{" "}
+                &mdash; Available resolution options
+              </li>
             </ul>
           </div>
           <div className="space-y-1">
@@ -351,6 +470,18 @@ export function SettingsView() {
               action), Suspects (potential threats), or Operational findings
               (configuration and health). Each finding links directly to the
               Blumira platform for investigation and response.
+            </p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-foreground font-medium">
+              MCP Server Integration:
+            </p>
+            <p>
+              The analysis capabilities in this dashboard are inspired by the
+              Blumira MCP Server, which provides 27 tools for security
+              operations through the Model Context Protocol. This includes
+              investigation comments, finding resolution, executive summaries,
+              and bidirectional data flow with the Blumira platform.
             </p>
           </div>
         </CardContent>
