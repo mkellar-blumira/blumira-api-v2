@@ -292,6 +292,132 @@ export async function fetchFindingDetail(
   }
 }
 
+export interface FindingComment {
+  id?: string;
+  body: string;
+  subject?: string;
+  age?: number;
+  created?: string;
+  modified?: string;
+  sender?: {
+    id?: string;
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+  };
+  [key: string]: unknown;
+}
+
+export interface FindingAnalysis {
+  finding: Finding | null;
+  comments: FindingComment[];
+  resolutions: Resolution[];
+}
+
+export interface Resolution {
+  id: number;
+  name: string;
+  [key: string]: unknown;
+}
+
+export async function fetchAccountFindingComments(
+  token: string,
+  accountId: string,
+  findingId: string
+): Promise<FindingComment[]> {
+  try {
+    const res = await apiGet<ApiResponse<FindingComment[]> & { data?: FindingComment[] }>(
+      `/msp/accounts/${accountId}/findings/${findingId}/comments`,
+      token
+    );
+    const data = res.data;
+    if (Array.isArray(data)) return data;
+    if (data) return [data as unknown as FindingComment];
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchResolutions(
+  token: string
+): Promise<Resolution[]> {
+  try {
+    const res = await apiGet<Record<string, unknown>>(
+      "/resolutions",
+      token
+    );
+    if (Array.isArray(res)) return res as Resolution[];
+    if (res.data && Array.isArray(res.data)) return res.data as Resolution[];
+    return [
+      { id: 10, name: "Valid" },
+      { id: 20, name: "False Positive" },
+      { id: 30, name: "No Action Needed" },
+      { id: 40, name: "Risk Accepted" },
+    ];
+  } catch {
+    return [
+      { id: 10, name: "Valid" },
+      { id: 20, name: "False Positive" },
+      { id: 30, name: "No Action Needed" },
+      { id: 40, name: "Risk Accepted" },
+    ];
+  }
+}
+
+async function apiPost<T = unknown>(
+  path: string,
+  token: string,
+  body: Record<string, unknown>
+): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`API request failed (${response.status}): ${text}`);
+  }
+
+  return response.json();
+}
+
+export async function resolveAccountFinding(
+  token: string,
+  accountId: string,
+  findingId: string,
+  resolution: number,
+  resolutionNotes?: string
+): Promise<Record<string, unknown>> {
+  const body: Record<string, unknown> = { resolution };
+  if (resolutionNotes) body.resolution_notes = resolutionNotes;
+  return apiPost(
+    `/msp/accounts/${accountId}/findings/${findingId}/resolve`,
+    token,
+    body
+  );
+}
+
+export async function addAccountFindingComment(
+  token: string,
+  accountId: string,
+  findingId: string,
+  commentBody: string,
+  sender: string
+): Promise<FindingComment> {
+  return apiPost<FindingComment>(
+    `/msp/accounts/${accountId}/findings/${findingId}/comments`,
+    token,
+    { body: commentBody, sender }
+  );
+}
+
 export async function fetchEnrichedAccount(
   token: string,
   account: MspAccount
