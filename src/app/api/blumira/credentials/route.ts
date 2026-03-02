@@ -1,19 +1,53 @@
 import { NextResponse } from "next/server";
+import { isDemoMode } from "@/lib/demo-data";
+
+let runtimeDemoMode: boolean | null = null;
+
+export function getRuntimeDemoMode(): boolean {
+  if (runtimeDemoMode !== null) return runtimeDemoMode;
+  return isDemoMode();
+}
+
+export function setRuntimeDemoMode(value: boolean) {
+  runtimeDemoMode = value;
+}
 
 export async function GET() {
   const hasClientId = !!process.env.BLUMIRA_CLIENT_ID;
   const hasClientSecret = !!process.env.BLUMIRA_CLIENT_SECRET;
+  const demoMode = getRuntimeDemoMode();
 
   return NextResponse.json({
     hasCredentials: hasClientId && hasClientSecret,
     hasClientId,
     hasClientSecret,
+    demoMode,
+    dataSource: demoMode ? "demo" : hasClientId && hasClientSecret ? "live" : "none",
+    environment: {
+      demoModeEnv: process.env.DEMO_MODE || "false",
+      hasClientIdEnv: hasClientId,
+      hasClientSecretEnv: hasClientSecret,
+      nodeEnv: process.env.NODE_ENV || "development",
+    },
   });
 }
 
 export async function POST(request: Request) {
   try {
-    const { clientId, clientSecret } = await request.json();
+    const body = await request.json();
+
+    if (body.toggleDemo !== undefined) {
+      setRuntimeDemoMode(!!body.toggleDemo);
+      return NextResponse.json({
+        success: true,
+        demoMode: getRuntimeDemoMode(),
+        message: body.toggleDemo
+          ? "Demo mode enabled — using synthetic data"
+          : "Demo mode disabled — using live API data",
+      });
+    }
+
+    const { clientId, clientSecret } = body;
 
     if (!clientId || !clientSecret) {
       return NextResponse.json(
@@ -54,6 +88,10 @@ export async function POST(request: Request) {
 
     process.env.BLUMIRA_CLIENT_ID = clientId;
     process.env.BLUMIRA_CLIENT_SECRET = clientSecret;
+
+    if (getRuntimeDemoMode()) {
+      setRuntimeDemoMode(false);
+    }
 
     return NextResponse.json({
       success: true,

@@ -17,6 +17,8 @@ import {
   Loader2,
   Settings,
   RefreshCw,
+  FlaskConical,
+  X,
 } from "lucide-react";
 import type { Finding, MspAccount, BlumiraUser } from "@/lib/blumira-api";
 
@@ -24,7 +26,8 @@ interface DashboardData {
   accounts: MspAccount[];
   findings: Finding[];
   users: BlumiraUser[];
-  meta?: { timestamp: string };
+  meta?: { timestamp: string; dataSource?: string };
+  demoMode?: boolean;
 }
 
 export function DashboardShell() {
@@ -36,6 +39,8 @@ export function DashboardShell() {
   const [error, setError] = useState<string | null>(null);
   const [credentialsMissing, setCredentialsMissing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [demoMode, setDemoMode] = useState(false);
+  const [demoBannerDismissed, setDemoBannerDismissed] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -46,6 +51,13 @@ export function DashboardShell() {
 
       if (!res.ok) {
         throw new Error(result.error || "Failed to fetch dashboard data");
+      }
+
+      if (result.demoMode) {
+        setDemoMode(true);
+        setDemoBannerDismissed(false);
+      } else {
+        setDemoMode(false);
       }
 
       if (result.requiresAuth || result.authError) {
@@ -69,6 +81,31 @@ export function DashboardShell() {
   const handleRefresh = () => {
     setRefreshing(true);
     fetchData();
+  };
+
+  const handleDemoModeChange = (enabled: boolean) => {
+    setDemoMode(enabled);
+    setDemoBannerDismissed(false);
+    setLoading(true);
+    fetchData();
+  };
+
+  const handleEnableDemo = async () => {
+    try {
+      const res = await fetch("/api/blumira/credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toggleDemo: true }),
+      });
+      if (res.ok) {
+        setDemoMode(true);
+        setCredentialsMissing(false);
+        setLoading(true);
+        fetchData();
+      }
+    } catch {
+      setError("Failed to enable demo mode");
+    }
   };
 
   const findings = data?.findings || [];
@@ -109,13 +146,19 @@ export function DashboardShell() {
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
                 Configure your Blumira API credentials to access the MSP
-                Dashboard.
+                Dashboard, or try demo mode to explore with sample data.
               </p>
             </div>
-            <Button onClick={() => { setActiveView("settings"); setCredentialsMissing(false); setError(null); }}>
-              <Settings className="h-4 w-4 mr-2" />
-              Configure Credentials
-            </Button>
+            <div className="flex flex-col gap-2">
+              <Button onClick={() => { setActiveView("settings"); setCredentialsMissing(false); setError(null); }}>
+                <Settings className="h-4 w-4 mr-2" />
+                Configure Credentials
+              </Button>
+              <Button variant="outline" onClick={handleEnableDemo}>
+                <FlaskConical className="h-4 w-4 mr-2" />
+                Try Demo Mode
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -143,6 +186,10 @@ export function DashboardShell() {
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Retry
               </Button>
+              <Button variant="outline" onClick={handleEnableDemo}>
+                <FlaskConical className="h-4 w-4 mr-2" />
+                Try Demo Mode
+              </Button>
               <Button onClick={() => { setActiveView("settings"); setError(null); }}>
                 <Settings className="h-4 w-4 mr-2" />
                 Settings
@@ -165,6 +212,28 @@ export function DashboardShell() {
       />
 
       <div className="flex flex-col flex-1 overflow-hidden">
+        {demoMode && !demoBannerDismissed && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-purple-500/10 border-b border-purple-500/20 text-purple-300 text-sm">
+            <FlaskConical className="h-4 w-4 shrink-0" />
+            <span className="flex-1">
+              Demo mode is active — you&apos;re viewing synthetic data.{" "}
+              <button
+                className="underline hover:text-purple-200 transition-colors"
+                onClick={() => setActiveView("settings")}
+              >
+                Go to Settings
+              </button>{" "}
+              to connect real credentials or toggle demo mode off.
+            </span>
+            <button
+              className="p-0.5 hover:bg-purple-500/20 rounded transition-colors"
+              onClick={() => setDemoBannerDismissed(true)}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
         <Header
           onRefresh={handleRefresh}
           refreshing={refreshing}
@@ -195,7 +264,9 @@ export function DashboardShell() {
           {activeView === "analytics" && (
             <AnalyticsView findings={findings} />
           )}
-          {activeView === "settings" && <SettingsView />}
+          {activeView === "settings" && (
+            <SettingsView onDemoModeChange={handleDemoModeChange} />
+          )}
         </main>
       </div>
     </div>

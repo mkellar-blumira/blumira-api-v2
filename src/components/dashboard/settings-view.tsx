@@ -12,6 +12,10 @@ import {
   RefreshCw,
   Trash2,
   Info,
+  Database,
+  FlaskConical,
+  Server,
+  Loader2,
 } from "lucide-react";
 import {
   Card,
@@ -25,17 +29,31 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 
 interface CredentialsStatus {
   hasCredentials: boolean;
   hasClientId: boolean;
   hasClientSecret: boolean;
+  demoMode: boolean;
+  dataSource: "demo" | "live" | "none";
+  environment: {
+    demoModeEnv: string;
+    hasClientIdEnv: boolean;
+    hasClientSecretEnv: boolean;
+    nodeEnv: string;
+  };
 }
 
-export function SettingsView() {
+interface SettingsViewProps {
+  onDemoModeChange?: (demoMode: boolean) => void;
+}
+
+export function SettingsView({ onDemoModeChange }: SettingsViewProps) {
   const [status, setStatus] = useState<CredentialsStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [togglingDemo, setTogglingDemo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showId, setShowId] = useState(false);
@@ -85,10 +103,36 @@ export function SettingsView() {
       setSuccess("Credentials validated and saved successfully");
       setForm({ clientId: "", clientSecret: "" });
       await fetchStatus();
+      onDemoModeChange?.(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDemoToggle = async (enabled: boolean) => {
+    setTogglingDemo(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const res = await fetch("/api/blumira/credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toggleDemo: enabled }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to toggle demo mode");
+
+      setSuccess(data.message);
+      await fetchStatus();
+      onDemoModeChange?.(enabled);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to toggle demo mode");
+    } finally {
+      setTogglingDemo(false);
     }
   };
 
@@ -97,10 +141,156 @@ export function SettingsView() {
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
         <p className="text-muted-foreground">
-          Configure your Blumira API connection
+          Configure your Blumira API connection and data source
         </p>
       </div>
 
+      {/* Data Source Status */}
+      <Card className="border-blue-500/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Database className="h-4 w-4" />
+            Data Source Status
+          </CardTitle>
+          <CardDescription>
+            See where your dashboard data is coming from
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {loading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Checking status...
+            </div>
+          ) : status ? (
+            <>
+              <div className="flex items-center gap-3 p-4 rounded-lg border bg-card">
+                {status.dataSource === "demo" ? (
+                  <FlaskConical className="h-6 w-6 text-purple-400" />
+                ) : status.dataSource === "live" ? (
+                  <Server className="h-6 w-6 text-emerald-400" />
+                ) : (
+                  <AlertTriangle className="h-6 w-6 text-amber-400" />
+                )}
+                <div className="flex-1">
+                  <p className="text-sm font-medium">
+                    {status.dataSource === "demo"
+                      ? "Demo Mode Active"
+                      : status.dataSource === "live"
+                        ? "Live API Connected"
+                        : "No Data Source"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {status.dataSource === "demo"
+                      ? "Displaying synthetic data for testing and exploration"
+                      : status.dataSource === "live"
+                        ? "Fetching real-time data from the Blumira API"
+                        : "Configure credentials or enable demo mode to get started"}
+                  </p>
+                </div>
+                <Badge
+                  variant={
+                    status.dataSource === "demo"
+                      ? "secondary"
+                      : status.dataSource === "live"
+                        ? "success"
+                        : "warning"
+                  }
+                >
+                  {status.dataSource === "demo"
+                    ? "Demo"
+                    : status.dataSource === "live"
+                      ? "Live"
+                      : "Inactive"}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="p-3 rounded-lg border space-y-1.5">
+                  <p className="font-medium text-muted-foreground uppercase tracking-wider">Environment</p>
+                  <div className="flex items-center justify-between">
+                    <span>Node Env</span>
+                    <Badge variant="outline" className="text-[10px] px-1.5">{status.environment.nodeEnv}</Badge>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Demo Mode (env)</span>
+                    <Badge variant="outline" className="text-[10px] px-1.5">{status.environment.demoModeEnv}</Badge>
+                  </div>
+                </div>
+                <div className="p-3 rounded-lg border space-y-1.5">
+                  <p className="font-medium text-muted-foreground uppercase tracking-wider">Credentials</p>
+                  <div className="flex items-center justify-between">
+                    <span>Client ID</span>
+                    {status.hasClientId ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                    ) : (
+                      <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Client Secret</span>
+                    {status.hasClientSecret ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                    ) : (
+                      <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      {/* Demo Mode Toggle */}
+      <Card className="border-purple-500/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <FlaskConical className="h-4 w-4" />
+            Demo Mode
+          </CardTitle>
+          <CardDescription>
+            Use synthetic data to explore the dashboard without real API credentials
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-4 rounded-lg border">
+            <div className="space-y-0.5">
+              <Label htmlFor="demo-mode" className="text-sm font-medium cursor-pointer">
+                Enable Demo Mode
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Loads realistic sample data including 5 organizations, 18 findings, 198 devices, and 10 users
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {togglingDemo && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+              <Switch
+                id="demo-mode"
+                checked={status?.demoMode || false}
+                onCheckedChange={handleDemoToggle}
+                disabled={togglingDemo}
+              />
+            </div>
+          </div>
+
+          {status?.demoMode && (
+            <div className="flex items-center gap-2 p-3 rounded-lg border border-purple-500/30 bg-purple-500/5 text-purple-300 text-sm">
+              <FlaskConical className="h-4 w-4 shrink-0" />
+              Demo mode is active. The dashboard is showing synthetic data. Toggle off or enter real credentials to switch to live data.
+            </div>
+          )}
+
+          <p className="text-xs text-muted-foreground">
+            Tip: You can also enable demo mode via environment variable by setting{" "}
+            <code className="bg-muted px-1 rounded">DEMO_MODE=true</code> in your{" "}
+            <code className="bg-muted px-1 rounded">.env.local</code> file, or copy the provided{" "}
+            <code className="bg-muted px-1 rounded">.env.test</code> file.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* API Credentials */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">

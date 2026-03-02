@@ -6,10 +6,36 @@ import {
   fetchAccountUsers,
   type BlumiraUser,
 } from "@/lib/blumira-api";
+import {
+  getDemoAccounts,
+  getDemoFindings,
+  getDemoAllUsers,
+} from "@/lib/demo-data";
+import { getRuntimeDemoMode } from "../credentials/route";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  if (getRuntimeDemoMode()) {
+    const accounts = getDemoAccounts();
+    const findings = getDemoFindings();
+    const users = getDemoAllUsers();
+
+    return NextResponse.json({
+      accounts,
+      findings,
+      users,
+      demoMode: true,
+      meta: {
+        accountsCount: accounts.length,
+        findingsCount: findings.length,
+        usersCount: users.length,
+        timestamp: new Date().toISOString(),
+        dataSource: "demo",
+      },
+    });
+  }
+
   const hasClientId = !!process.env.BLUMIRA_CLIENT_ID;
   const hasClientSecret = !!process.env.BLUMIRA_CLIENT_SECRET;
 
@@ -72,6 +98,7 @@ export async function GET() {
         findingsCount: findings.length,
         usersCount: users.length,
         timestamp: new Date().toISOString(),
+        dataSource: "live",
       },
     });
   } catch (error) {

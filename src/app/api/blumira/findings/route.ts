@@ -3,6 +3,8 @@ import {
   getAccessToken,
   fetchFindingDetail,
 } from "@/lib/blumira-api";
+import { getDemoFindingDetail } from "@/lib/demo-data";
+import { getRuntimeDemoMode } from "../credentials/route";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,17 @@ export async function GET(request: NextRequest) {
         { error: "accountId and findingId are required" },
         { status: 400 }
       );
+    }
+
+    if (getRuntimeDemoMode()) {
+      const finding = getDemoFindingDetail(accountId, findingId);
+      if (!finding) {
+        return NextResponse.json(
+          { error: "Finding not found" },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json({ data: finding, demoMode: true });
     }
 
     const token = await getAccessToken();

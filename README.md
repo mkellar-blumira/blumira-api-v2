@@ -67,6 +67,42 @@ BLUMIRA_CLIENT_SECRET=your_client_secret
 
 Alternatively, you can configure credentials through the Settings page in the dashboard UI.
 
+### Demo Mode (Test Environment)
+
+If you don't have Blumira API credentials or want to explore the dashboard with sample data, you can enable **demo mode**:
+
+**Option 1 — Use the `.env.test` file:**
+```bash
+cp .env.test .env.local
+npm run dev
+```
+
+**Option 2 — Set the environment variable manually:**
+```bash
+# Add to .env.local
+DEMO_MODE=true
+NEXT_PUBLIC_DEMO_MODE=true
+```
+
+**Option 3 — Toggle in the UI:**
+
+Launch the dashboard and either:
+- Click **"Try Demo Mode"** on the credentials-required screen, or
+- Go to **Settings** and flip the **Demo Mode** toggle
+
+Demo mode provides synthetic data including 5 organizations, 18 security findings, ~198 agent devices, and 10 users — enough to exercise every dashboard view.
+
+When you're ready to connect real data, enter your Blumira API credentials in Settings. Saving valid credentials automatically disables demo mode.
+
+### Data Source Status
+
+The **Settings** page includes a **Data Source Status** panel that shows:
+- Whether the dashboard is using **live API data**, **demo data**, or has **no data source**
+- Which environment variables are configured
+- Whether Client ID and Client Secret are present
+
+This makes it easy to verify that your credentials are stored and your connection is active.
+
 ### Development
 
 ```bash
@@ -85,28 +121,32 @@ npm start
 ## Project Structure
 
 ```
+.env.example                   # Environment template
+.env.test                      # Test/demo environment (copy to .env.local)
 src/
 ├── app/
-│   ├── api/blumira/          # API proxy routes
-│   │   ├── credentials/      # Credential management
-│   │   ├── dashboard/        # Main data endpoint
-│   │   └── organizations/    # Enriched org data
-│   ├── globals.css           # Tailwind + dark theme
-│   ├── layout.tsx            # Root layout
-│   └── page.tsx              # Dashboard entry point
+│   ├── api/blumira/           # API proxy routes
+│   │   ├── credentials/       # Credential management + demo toggle
+│   │   ├── dashboard/         # Main data endpoint
+│   │   ├── findings/          # Finding detail endpoint
+│   │   └── organizations/     # Enriched org data
+│   ├── globals.css            # Tailwind + dark theme
+│   ├── layout.tsx             # Root layout
+│   └── page.tsx               # Dashboard entry point
 ├── components/
-│   ├── dashboard/            # Dashboard views
-│   │   ├── dashboard-shell   # Main layout with sidebar
-│   │   ├── overview-view     # Security overview
-│   │   ├── findings-view     # Findings table
-│   │   ├── organizations-view# Org management
-│   │   ├── agents-view       # Devices & agents
-│   │   ├── analytics-view    # Charts & analytics
-│   │   └── settings-view     # Credentials config
-│   └── ui/                   # Reusable UI primitives
+│   ├── dashboard/             # Dashboard views
+│   │   ├── dashboard-shell    # Main layout with sidebar + demo banner
+│   │   ├── overview-view      # Security overview
+│   │   ├── findings-view      # Findings table
+│   │   ├── organizations-view # Org management
+│   │   ├── agents-view        # Devices & agents
+│   │   ├── analytics-view     # Charts & analytics
+│   │   └── settings-view      # Credentials, demo toggle, data status
+│   └── ui/                    # Reusable UI primitives
 └── lib/
-    ├── blumira-api.ts        # Blumira API client
-    └── utils.ts              # Utility functions
+    ├── blumira-api.ts         # Blumira API client
+    ├── demo-data.ts           # Synthetic demo data generator
+    └── utils.ts               # Utility functions
 ```
 
 ## About Blumira Findings
@@ -129,7 +169,7 @@ The dashboard can be deployed to any platform supporting Next.js:
 - **Docker** — Containerized deployment
 - **Any Node.js host** — Standard `npm run build && npm start`
 
-Set `BLUMIRA_CLIENT_ID` and `BLUMIRA_CLIENT_SECRET` as environment variables in your deployment platform.
+Set `BLUMIRA_CLIENT_ID` and `BLUMIRA_CLIENT_SECRET` as environment variables in your deployment platform. Optionally set `DEMO_MODE=true` and `NEXT_PUBLIC_DEMO_MODE=true` to start the dashboard in demo mode.
 
 ## License
 
