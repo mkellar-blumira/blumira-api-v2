@@ -28,6 +28,7 @@ interface DashboardData {
   users: BlumiraUser[];
   meta?: { timestamp: string; dataSource?: string };
   demoMode?: boolean;
+  authError?: string;
 }
 
 export function DashboardShell() {
@@ -60,12 +61,11 @@ export function DashboardShell() {
         setDemoMode(false);
       }
 
-      if (result.requiresAuth || result.authError) {
+      if (result.requiresAuth) {
         setCredentialsMissing(true);
-        setData(result);
-      } else {
-        setData(result);
       }
+
+      setData(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -231,6 +231,28 @@ export function DashboardShell() {
             >
               <X className="h-3.5 w-3.5" />
             </button>
+          </div>
+        )}
+
+        {data?.authError && !demoMode && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border-b border-amber-500/20 text-amber-300 text-sm">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span className="flex-1">
+              API authentication failed — credentials are configured but could not connect.{" "}
+              <button
+                className="underline hover:text-amber-200 transition-colors"
+                onClick={() => setActiveView("settings")}
+              >
+                Check Settings
+              </button>{" "}
+              to verify your credentials, or{" "}
+              <button
+                className="underline hover:text-amber-200 transition-colors"
+                onClick={handleEnableDemo}
+              >
+                try demo mode
+              </button>.
+            </span>
           </div>
         )}
 
