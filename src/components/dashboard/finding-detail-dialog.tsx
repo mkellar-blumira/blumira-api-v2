@@ -35,18 +35,17 @@ import {
   UserCheck,
   XSquare,
   RotateCcw,
-  Database,
   ChevronLeft,
   ChevronRight,
   MessageSquare,
   Paperclip,
   MapPin,
   Hash,
-  ArrowUpDown,
   Copy,
   Check,
   ChevronDown,
   ChevronUp,
+  Terminal,
 } from "lucide-react";
 import type {
   Finding,
@@ -202,19 +201,24 @@ function CopyButton({ text }: { text: string }) {
     setTimeout(() => setCopied(false), 1500);
   };
   return (
-    <button onClick={handleCopy} className="text-muted-foreground hover:text-foreground transition-colors p-0.5" title="Copy value">
-      {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+    <button onClick={handleCopy} className="text-neutral-500 hover:text-neutral-300 transition-colors p-0.5" title="Copy value">
+      {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
     </button>
   );
 }
 
 function formatEvidenceValue(value: unknown): string {
-  if (value === null || value === undefined) return "—";
+  if (value === null || value === undefined) return "";
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
 }
 
-function EvidenceTable({
+function formatKeyLabel(key: string): string {
+  if (key === "__time_matched") return "time";
+  return key.replace(/_/g, " ");
+}
+
+function EvidenceLogs({
   evidence,
   loading,
   page,
@@ -225,195 +229,132 @@ function EvidenceTable({
   page: number;
   onPageChange: (page: number) => void;
 }) {
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-        <span className="ml-2 text-sm text-muted-foreground">Loading evidence...</span>
+      <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-4">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin text-neutral-500" />
+          <span className="text-sm text-neutral-400 font-mono">Loading evidence logs...</span>
+        </div>
       </div>
     );
   }
 
   if (!evidence || evidence.data.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-        <Database className="h-8 w-8 mb-2 opacity-50" />
-        <p className="text-sm">No evidence data available for this finding</p>
+      <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-6 text-center">
+        <Terminal className="h-6 w-6 text-neutral-600 mx-auto mb-2" />
+        <p className="text-sm text-neutral-500 font-mono">No evidence logs available</p>
       </div>
     );
   }
 
   const keys = evidence.evidence_keys;
-  const displayKeys = keys.length > 6 ? keys.slice(0, 6) : keys;
-  const hasMoreKeys = keys.length > 6;
-
-  const sortedData = [...evidence.data];
-  if (sortKey) {
-    sortedData.sort((a, b) => {
-      const va = String(a[sortKey] ?? "");
-      const vb = String(b[sortKey] ?? "");
-      const cmp = va.localeCompare(vb);
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-  }
-
-  const toggleSort = (key: string) => {
-    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
-    else { setSortKey(key); setSortDir("desc"); }
-  };
-
   const meta = evidence.meta;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Database className="h-4 w-4 text-muted-foreground" />
-          <h4 className="text-sm font-semibold">Evidence</h4>
-          <Badge variant="secondary" className="text-[10px]">{meta.total_items} row{meta.total_items !== 1 ? "s" : ""}</Badge>
+          <Terminal className="h-4 w-4 text-muted-foreground" />
+          <h4 className="text-sm font-semibold">Evidence Logs</h4>
+          <Badge variant="secondary" className="text-[10px]">{meta.total_items} log{meta.total_items !== 1 ? "s" : ""}</Badge>
         </div>
         {meta.total_pages > 1 && (
           <div className="flex items-center gap-2">
             <Button
-              variant="outline" size="icon" className="h-7 w-7"
+              variant="outline" size="icon" className="h-6 w-6"
               disabled={page <= 1}
               onClick={() => onPageChange(page - 1)}
             >
-              <ChevronLeft className="h-3.5 w-3.5" />
+              <ChevronLeft className="h-3 w-3" />
             </Button>
             <span className="text-xs text-muted-foreground">
-              Page {meta.page} of {meta.total_pages}
+              {meta.page}/{meta.total_pages}
             </span>
             <Button
-              variant="outline" size="icon" className="h-7 w-7"
+              variant="outline" size="icon" className="h-6 w-6"
               disabled={page >= meta.total_pages}
               onClick={() => onPageChange(page + 1)}
             >
-              <ChevronRight className="h-3.5 w-3.5" />
+              <ChevronRight className="h-3 w-3" />
             </Button>
           </div>
         )}
       </div>
 
-      <div className="rounded-lg border overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-muted/50 border-b">
-                <th className="w-8 px-2 py-2" />
-                {displayKeys.map(key => (
-                  <th key={key} className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">
-                    <button
-                      onClick={() => toggleSort(key)}
-                      className="flex items-center gap-1 hover:text-foreground transition-colors"
-                    >
-                      {key === "__time_matched" ? "Time" : key.replace(/_/g, " ")}
-                      {sortKey === key ? (
-                        sortDir === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
-                      ) : (
-                        <ArrowUpDown className="h-3 w-3 opacity-30" />
+      <div className="rounded-lg border border-neutral-800 bg-neutral-950 overflow-hidden">
+        <div className="max-h-[360px] overflow-y-auto">
+          {evidence.data.map((row, idx) => {
+            const isExpanded = expandedRow === idx;
+            const timeVal = row["__time_matched"] ? formatEvidenceValue(row["__time_matched"]) : null;
+            const summaryKeys = keys.filter(k => k !== "__time_matched");
+
+            return (
+              <div key={idx}>
+                <button
+                  onClick={() => setExpandedRow(isExpanded ? null : idx)}
+                  className={`w-full text-left px-3 py-1.5 font-mono text-xs border-b border-neutral-800/60 transition-colors hover:bg-neutral-900 ${isExpanded ? "bg-neutral-900" : ""}`}
+                >
+                  <div className="flex items-start gap-2 min-w-0">
+                    <span className="text-neutral-600 shrink-0 w-4 pt-px">
+                      {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    </span>
+                    {timeVal && (
+                      <span className="text-neutral-500 shrink-0">
+                        {(() => {
+                          try { return format(new Date(timeVal), "HH:mm:ss.SSS"); }
+                          catch { return timeVal; }
+                        })()}
+                      </span>
+                    )}
+                    <span className="text-neutral-200 truncate">
+                      {summaryKeys.slice(0, 4).map((k) => {
+                        const v = formatEvidenceValue(row[k]);
+                        if (!v) return null;
+                        return (
+                          <span key={k}>
+                            <span className="text-blue-400">{formatKeyLabel(k)}</span>
+                            <span className="text-neutral-500">=</span>
+                            <span className="text-emerald-300">{v}</span>
+                            <span className="text-neutral-700 mx-1.5">|</span>
+                          </span>
+                        );
+                      })}
+                      {summaryKeys.length > 4 && (
+                        <span className="text-neutral-600">+{summaryKeys.length - 4} more</span>
                       )}
-                    </button>
-                  </th>
-                ))}
-                {hasMoreKeys && (
-                  <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                    +{keys.length - 6} more
-                  </th>
+                    </span>
+                  </div>
+                </button>
+                {isExpanded && (
+                  <div className="bg-neutral-900/80 border-b border-neutral-800/60 px-3 py-2.5">
+                    <div className="grid gap-1 ml-6">
+                      {keys.map(key => {
+                        const val = formatEvidenceValue(row[key]);
+                        if (!val) return null;
+                        return (
+                          <div key={key} className="flex items-start gap-2 font-mono text-xs group min-w-0">
+                            <span className="text-blue-400 shrink-0 min-w-[120px] text-right">{formatKeyLabel(key)}</span>
+                            <span className="text-neutral-600">:</span>
+                            <span className="text-neutral-200 break-all flex-1 select-all">{val}</span>
+                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
+                              <CopyButton text={val} />
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
-              </tr>
-            </thead>
-            <tbody>
-              {sortedData.map((row, idx) => {
-                const isExpanded = expandedRow === idx;
-                return (
-                  <EvidenceRowComponent
-                    key={idx}
-                    row={row}
-                    idx={idx}
-                    displayKeys={displayKeys}
-                    allKeys={keys}
-                    hasMoreKeys={hasMoreKeys}
-                    isExpanded={isExpanded}
-                    onToggleExpand={() => setExpandedRow(isExpanded ? null : idx)}
-                  />
-                );
-              })}
-            </tbody>
-          </table>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
-  );
-}
-
-function EvidenceRowComponent({
-  row,
-  idx,
-  displayKeys,
-  allKeys,
-  hasMoreKeys,
-  isExpanded,
-  onToggleExpand,
-}: {
-  row: EvidenceRow;
-  idx: number;
-  displayKeys: string[];
-  allKeys: string[];
-  hasMoreKeys: boolean;
-  isExpanded: boolean;
-  onToggleExpand: () => void;
-}) {
-  return (
-    <>
-      <tr className={`border-b last:border-0 transition-colors hover:bg-muted/30 ${isExpanded ? "bg-muted/20" : ""}`}>
-        <td className="px-2 py-1.5">
-          <button onClick={onToggleExpand} className="text-muted-foreground hover:text-foreground p-0.5">
-            {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-          </button>
-        </td>
-        {displayKeys.map(key => {
-          const val = formatEvidenceValue(row[key]);
-          const isTime = key === "__time_matched";
-          return (
-            <td key={key} className="px-3 py-1.5 max-w-[200px] truncate whitespace-nowrap font-mono" title={val}>
-              {isTime && val !== "—" ? (
-                <span className="text-muted-foreground">{format(new Date(val), "MMM d HH:mm:ss")}</span>
-              ) : (
-                val
-              )}
-            </td>
-          );
-        })}
-        {hasMoreKeys && (
-          <td className="px-3 py-1.5 text-muted-foreground">...</td>
-        )}
-      </tr>
-      {isExpanded && (
-        <tr className="bg-muted/10">
-          <td colSpan={displayKeys.length + (hasMoreKeys ? 2 : 1)} className="px-4 py-3">
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
-              {allKeys.map(key => {
-                const val = formatEvidenceValue(row[key]);
-                return (
-                  <div key={key} className="flex items-start gap-2 min-w-0">
-                    <span className="font-medium text-muted-foreground shrink-0 w-32 text-right">
-                      {key === "__time_matched" ? "Time" : key.replace(/_/g, " ")}:
-                    </span>
-                    <span className="font-mono break-all flex-1">{val}</span>
-                    {val !== "—" && <CopyButton text={val} />}
-                  </div>
-                );
-              })}
-            </div>
-          </td>
-        </tr>
-      )}
-    </>
   );
 }
 
@@ -436,7 +377,7 @@ function CommentsSection({
   if (comments.length === 0) return null;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div className="flex items-center gap-2">
         <MessageSquare className="h-4 w-4 text-muted-foreground" />
         <h4 className="text-sm font-semibold">Comments</h4>
@@ -498,14 +439,6 @@ export function FindingDetailDialog({
   const [comments, setComments] = useState<FindingComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<"details" | "evidence" | "comments" | "notes">("details");
-
-  const reload = useCallback(() => {
-    if (!finding) return;
-    setAnnotation(getAnnotation(finding.finding_id));
-    onAnnotationChange?.();
-  }, [finding, onAnnotationChange]);
-
   const fetchEvidence = useCallback((accountId: string, findingId: string, page: number) => {
     setLoadingEvidence(true);
     fetch(`/api/blumira/findings/evidence?accountId=${accountId}&findingId=${findingId}&page=${page}&pageSize=50`)
@@ -537,7 +470,6 @@ export function FindingDetailDialog({
       setAssigneeInput(a?.assignee || "");
       setNewNote("");
       setShowAssignee(false);
-      setActiveTab("details");
       setEvidencePage(1);
       setEvidence(null);
       setComments([]);
@@ -616,8 +548,6 @@ export function FindingDetailDialog({
   const isClosed = annotation?.localStatus === "closed";
 
   const noteCount = annotation?.notes?.length || 0;
-  const commentCount = comments.length;
-  const evidenceCount = evidence?.meta?.total_items || 0;
 
   const ownersList: string[] = [];
   if (detail.owners) {
@@ -630,6 +560,12 @@ export function FindingDetailDialog({
       }
     }
   }
+
+  const categoryDisplay = detail.category_name
+    || (typeof detail.category === "string" && detail.category)
+    || null;
+
+  const hasTechnicalDetails = detail.ip_address || detail.hostname || detail.url || detail.user || detail.workflow_name || detail.rule_name || detail.detector_name;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -672,6 +608,7 @@ export function FindingDetailDialog({
           </div>
         </DialogHeader>
 
+        {/* Actions */}
         <div className="flex gap-2 flex-wrap">
           <Button size="sm" variant="outline" onClick={handleTakeOwnership}>
             <UserCheck className="h-3.5 w-3.5 mr-1.5" />
@@ -716,234 +653,205 @@ export function FindingDetailDialog({
           </div>
         )}
 
-        {/* Tab navigation */}
-        <div className="flex gap-1 border-b">
-          {([
-            { id: "details" as const, label: "Details", icon: <FileText className="h-3.5 w-3.5" /> },
-            { id: "evidence" as const, label: "Evidence", icon: <Database className="h-3.5 w-3.5" />, count: evidenceCount },
-            { id: "comments" as const, label: "Comments", icon: <MessageSquare className="h-3.5 w-3.5" />, count: commentCount },
-            { id: "notes" as const, label: "Notes", icon: <StickyNote className="h-3.5 w-3.5" />, count: noteCount },
-          ]).map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
-                activeTab === tab.id
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
-              }`}
-            >
-              {tab.icon}
-              {tab.label}
-              {tab.count != null && tab.count > 0 && (
-                <Badge variant="secondary" className="text-[10px] h-4 px-1">{tab.count}</Badge>
-              )}
-            </button>
-          ))}
-        </div>
-
-        <div className="space-y-4 min-h-[200px]">
-          {loadingDetail && activeTab === "details" && (
+        {/* All content in a single scrollable flow */}
+        <div className="space-y-4">
+          {loadingDetail && (
             <div className="flex items-center justify-center py-4">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
               <span className="ml-2 text-sm text-muted-foreground">Loading details...</span>
             </div>
           )}
 
-          {/* Details Tab */}
-          {activeTab === "details" && (
-            <>
-              <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
-                <DetailRow icon={<Building2 className="h-4 w-4" />} label="Organization" value={detail.org_name} />
-                {detail.short_id && <DetailRow icon={<Hash className="h-4 w-4" />} label="Finding ID" value={<code className="text-xs bg-muted rounded px-1.5 py-0.5">{detail.short_id}</code>} />}
-                <DetailRow icon={<Tag className="h-4 w-4" />} label="Type" value={detail.type_name} />
-                {(detail.category_name || detail.category) && (
-                  <DetailRow icon={<Tag className="h-4 w-4" />} label="Category"
-                    value={<span>{detail.category_name || detail.category}{detail.subcategory && ` / ${detail.subcategory}`}</span>} />
-                )}
-                {detail.jurisdiction_name && <DetailRow icon={<Shield className="h-4 w-4" />} label="Jurisdiction" value={detail.jurisdiction_name} />}
-                {detail.source && <DetailRow icon={<Eye className="h-4 w-4" />} label="Source" value={detail.source} />}
-                <DetailRow icon={<Clock className="h-4 w-4" />} label="Created"
-                  value={
-                    <span>
-                      {format(new Date(detail.created), "MMM d, yyyy 'at' h:mm a")}
-                      <span className="text-muted-foreground ml-2">({formatDistanceToNow(new Date(detail.created), { addSuffix: true })})</span>
-                    </span>
-                  } />
-                {detail.modified && (
-                  <DetailRow icon={<Clock className="h-4 w-4" />} label="Modified"
-                    value={
-                      <span>
-                        {format(new Date(detail.modified), "MMM d, yyyy 'at' h:mm a")}
-                        {detail.modified_by && (
-                          <span className="text-muted-foreground ml-2">by {formatPersonName(detail.modified_by)}</span>
-                        )}
-                      </span>
-                    } />
-                )}
-                {detail.status_modified && (
-                  <DetailRow icon={<Clock className="h-4 w-4" />} label="Status Changed"
-                    value={
-                      <span>
-                        {format(new Date(detail.status_modified), "MMM d, yyyy 'at' h:mm a")}
-                        {detail.status_modified_by && (
-                          <span className="text-muted-foreground ml-2">by {formatPersonName(detail.status_modified_by)}</span>
-                        )}
-                      </span>
-                    } />
-                )}
-                {detail.resolution_name && <DetailRow icon={<CheckCircle2 className="h-4 w-4" />} label="Resolution" value={detail.resolution_name} />}
-                {detail.resolution_notes && <DetailRow icon={<FileText className="h-4 w-4" />} label="Resolution Notes" value={detail.resolution_notes} />}
-                {ownersList.length > 0 && (
-                  <DetailRow icon={<UserCheck className="h-4 w-4" />} label="Owners" value={ownersList.join(", ")} />
-                )}
-                {detail.locations && detail.locations.length > 0 && (
-                  <DetailRow icon={<MapPin className="h-4 w-4" />} label="Locations"
-                    value={detail.locations.map(l => `${l.name}${l.city ? ` (${l.city})` : ""}`).join(", ")} />
-                )}
-                {detail.src_country && detail.src_country.length > 0 && (
-                  <DetailRow icon={<Globe className="h-4 w-4" />} label="Source Countries" value={detail.src_country.join(", ")} />
-                )}
-              </div>
+          {/* Finding details */}
+          <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
+            <DetailRow icon={<Building2 className="h-4 w-4" />} label="Organization" value={detail.org_name} />
+            {detail.short_id && <DetailRow icon={<Hash className="h-4 w-4" />} label="Finding ID" value={<code className="text-xs bg-muted rounded px-1.5 py-0.5">{detail.short_id}</code>} />}
+            <DetailRow icon={<Tag className="h-4 w-4" />} label="Type" value={detail.type_name} />
+            {categoryDisplay && (
+              <DetailRow icon={<Tag className="h-4 w-4" />} label="Category"
+                value={<span>{categoryDisplay}{detail.subcategory && ` / ${detail.subcategory}`}</span>} />
+            )}
+            {detail.jurisdiction_name && <DetailRow icon={<Shield className="h-4 w-4" />} label="Jurisdiction" value={detail.jurisdiction_name} />}
+            {detail.source && <DetailRow icon={<Eye className="h-4 w-4" />} label="Source" value={detail.source} />}
+            <DetailRow icon={<Clock className="h-4 w-4" />} label="Created"
+              value={
+                <span>
+                  {format(new Date(detail.created), "MMM d, yyyy 'at' h:mm a")}
+                  <span className="text-muted-foreground ml-2">({formatDistanceToNow(new Date(detail.created), { addSuffix: true })})</span>
+                </span>
+              } />
+            {detail.modified && (
+              <DetailRow icon={<Clock className="h-4 w-4" />} label="Modified"
+                value={
+                  <span>
+                    {format(new Date(detail.modified), "MMM d, yyyy 'at' h:mm a")}
+                    {detail.modified_by && (
+                      <span className="text-muted-foreground ml-2">by {formatPersonName(detail.modified_by)}</span>
+                    )}
+                  </span>
+                } />
+            )}
+            {detail.status_modified && (
+              <DetailRow icon={<Clock className="h-4 w-4" />} label="Status Changed"
+                value={
+                  <span>
+                    {format(new Date(detail.status_modified), "MMM d, yyyy 'at' h:mm a")}
+                    {detail.status_modified_by && (
+                      <span className="text-muted-foreground ml-2">by {formatPersonName(detail.status_modified_by)}</span>
+                    )}
+                  </span>
+                } />
+            )}
+            {detail.resolution_name && <DetailRow icon={<CheckCircle2 className="h-4 w-4" />} label="Resolution" value={detail.resolution_name} />}
+            {detail.resolution_notes && <DetailRow icon={<FileText className="h-4 w-4" />} label="Resolution Notes" value={detail.resolution_notes} />}
+            {ownersList.length > 0 && (
+              <DetailRow icon={<UserCheck className="h-4 w-4" />} label="Owners" value={ownersList.join(", ")} />
+            )}
+            {detail.locations && detail.locations.length > 0 && (
+              <DetailRow icon={<MapPin className="h-4 w-4" />} label="Locations"
+                value={detail.locations.map(l => `${l.name}${l.city ? ` (${l.city})` : ""}`).join(", ")} />
+            )}
+            {detail.src_country && detail.src_country.length > 0 && (
+              <DetailRow icon={<Globe className="h-4 w-4" />} label="Source Countries" value={detail.src_country.join(", ")} />
+            )}
+          </div>
 
-              {(detail.analysis || detail.summary || detail.description) && (
-                <div className="space-y-3">
-                  {detail.analysis && (
-                    <div>
-                      <h4 className="text-sm font-semibold mb-1 flex items-center gap-2"><Shield className="h-4 w-4 text-muted-foreground" />Analysis</h4>
-                      <p className="text-sm text-muted-foreground leading-relaxed bg-muted/30 rounded-lg p-3 whitespace-pre-wrap">{detail.analysis}</p>
-                    </div>
-                  )}
-                  {detail.summary && (
-                    <div>
-                      <h4 className="text-sm font-semibold mb-1 flex items-center gap-2"><FileText className="h-4 w-4 text-muted-foreground" />Summary</h4>
-                      <p className="text-sm text-muted-foreground leading-relaxed bg-muted/30 rounded-lg p-3">{detail.summary}</p>
-                    </div>
-                  )}
-                  {detail.description && (
-                    <div>
-                      <h4 className="text-sm font-semibold mb-1 flex items-center gap-2"><FileText className="h-4 w-4 text-muted-foreground" />Description</h4>
-                      <p className="text-sm text-muted-foreground leading-relaxed bg-muted/30 rounded-lg p-3 whitespace-pre-wrap">{detail.description}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {(detail.ip_address || detail.hostname || detail.url || detail.user || detail.workflow_name || detail.rule_name || detail.detector_name) && (
-                <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Technical Details</h4>
-                  {detail.ip_address && <DetailRow icon={<Globe className="h-4 w-4" />} label="IP Address" value={<code className="text-xs bg-muted rounded px-1.5 py-0.5">{detail.ip_address}</code>} />}
-                  {detail.hostname && <DetailRow icon={<Server className="h-4 w-4" />} label="Hostname" value={<code className="text-xs bg-muted rounded px-1.5 py-0.5">{detail.hostname}</code>} />}
-                  {detail.url && <DetailRow icon={<Globe className="h-4 w-4" />} label="URL" value={<a href={detail.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all text-xs">{detail.url}</a>} />}
-                  {detail.user && <DetailRow icon={<User className="h-4 w-4" />} label="User" value={detail.user} />}
-                  {detail.workflow_name && <DetailRow icon={<Workflow className="h-4 w-4" />} label="Workflow" value={detail.workflow_name} />}
-                  {detail.rule_name && <DetailRow icon={<Shield className="h-4 w-4" />} label="Rule" value={detail.rule_name} />}
-                  {detail.detector_name && <DetailRow icon={<Eye className="h-4 w-4" />} label="Detector" value={detail.detector_name} />}
-                </div>
-              )}
-
-              {detail.attachments && detail.attachments.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Paperclip className="h-4 w-4 text-muted-foreground" />
-                    <h4 className="text-sm font-semibold">Attachments</h4>
-                    <Badge variant="secondary" className="text-[10px]">{detail.attachments.length}</Badge>
-                  </div>
-                  <div className="space-y-1">
-                    {detail.attachments.map((att) => (
-                      <div key={att.id} className="flex items-center gap-2 text-sm rounded-lg border bg-muted/20 px-3 py-2">
-                        <Paperclip className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                        <span className="font-medium truncate">{att.filename}</span>
-                        <span className="text-xs text-muted-foreground ml-auto">
-                          {att.uploaded_at && format(new Date(att.uploaded_at), "MMM d, yyyy")}
-                          {att.uploaded_by && ` by ${formatPersonName(att.uploaded_by)}`}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {detail.related_findings && detail.related_findings.length > 0 && (
-                <div className="rounded-lg border bg-muted/30 p-4">
-                  <DetailRow icon={<FileText className="h-4 w-4" />} label="Related Findings"
-                    value={
-                      <div className="flex flex-wrap gap-1">
-                        {detail.related_findings.map(id => (
-                          <Badge key={id} variant="outline" className="font-mono text-[10px]">{id.slice(0, 8)}...</Badge>
-                        ))}
-                      </div>
-                    } />
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Evidence Tab */}
-          {activeTab === "evidence" && (
-            <EvidenceTable
-              evidence={evidence}
-              loading={loadingEvidence}
-              page={evidencePage}
-              onPageChange={handleEvidencePageChange}
-            />
-          )}
-
-          {/* Comments Tab */}
-          {activeTab === "comments" && (
-            <CommentsSection comments={comments} loading={loadingComments} />
-          )}
-
-          {/* Notes Tab */}
-          {activeTab === "notes" && (
+          {/* Analysis / Summary / Description */}
+          {(detail.analysis || detail.summary || detail.description) && (
             <div className="space-y-3">
-              <h4 className="text-sm font-semibold flex items-center gap-2">
-                <StickyNote className="h-4 w-4 text-blue-600" />
-                Notes
-                {noteCount > 0 && (
-                  <Badge variant="secondary" className="text-[10px]">{noteCount}</Badge>
-                )}
-              </h4>
-
-              {annotation?.notes && annotation.notes.length > 0 ? (
-                <div className="space-y-2">
-                  {[...annotation.notes].reverse().map((note, i) => (
-                    <div key={i} className={`rounded-lg border p-3 text-sm ${note.author === "System" ? "bg-muted/20 border-dashed" : "bg-muted/30"}`}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium">{note.author}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(note.timestamp), { addSuffix: true })}
-                        </span>
-                      </div>
-                      <p className="text-sm whitespace-pre-wrap">{note.text}</p>
-                    </div>
-                  ))}
+              {detail.analysis && (
+                <div>
+                  <h4 className="text-sm font-semibold mb-1 flex items-center gap-2"><Shield className="h-4 w-4 text-muted-foreground" />Analysis</h4>
+                  <p className="text-sm text-muted-foreground leading-relaxed bg-muted/30 rounded-lg p-3 whitespace-pre-wrap">{detail.analysis}</p>
                 </div>
-              ) : (
-                <p className="text-xs text-muted-foreground py-2">No notes yet. Add one below.</p>
               )}
-
-              <div className="flex gap-2">
-                <Textarea
-                  placeholder="Add a note..."
-                  value={newNote}
-                  onChange={(e) => setNewNote(e.target.value)}
-                  rows={2}
-                  className="flex-1"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                      e.preventDefault();
-                      handleAddNote();
-                    }
-                  }}
-                />
-                <Button size="sm" className="self-end" onClick={handleAddNote} disabled={!newNote.trim()}>
-                  <Send className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">Press Ctrl+Enter to send. Notes are stored locally in your browser.</p>
+              {detail.summary && (
+                <div>
+                  <h4 className="text-sm font-semibold mb-1 flex items-center gap-2"><FileText className="h-4 w-4 text-muted-foreground" />Summary</h4>
+                  <p className="text-sm text-muted-foreground leading-relaxed bg-muted/30 rounded-lg p-3">{detail.summary}</p>
+                </div>
+              )}
+              {detail.description && (
+                <div>
+                  <h4 className="text-sm font-semibold mb-1 flex items-center gap-2"><FileText className="h-4 w-4 text-muted-foreground" />Description</h4>
+                  <p className="text-sm text-muted-foreground leading-relaxed bg-muted/30 rounded-lg p-3 whitespace-pre-wrap">{detail.description}</p>
+                </div>
+              )}
             </div>
           )}
+
+          {/* Technical Details */}
+          {hasTechnicalDetails && (
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Technical Details</h4>
+              {detail.ip_address && <DetailRow icon={<Globe className="h-4 w-4" />} label="IP Address" value={<code className="text-xs bg-muted rounded px-1.5 py-0.5">{detail.ip_address}</code>} />}
+              {detail.hostname && <DetailRow icon={<Server className="h-4 w-4" />} label="Hostname" value={<code className="text-xs bg-muted rounded px-1.5 py-0.5">{detail.hostname}</code>} />}
+              {detail.url && <DetailRow icon={<Globe className="h-4 w-4" />} label="URL" value={<a href={detail.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all text-xs">{detail.url}</a>} />}
+              {detail.user && <DetailRow icon={<User className="h-4 w-4" />} label="User" value={detail.user} />}
+              {detail.workflow_name && <DetailRow icon={<Workflow className="h-4 w-4" />} label="Workflow" value={detail.workflow_name} />}
+              {detail.rule_name && <DetailRow icon={<Shield className="h-4 w-4" />} label="Rule" value={detail.rule_name} />}
+              {detail.detector_name && <DetailRow icon={<Eye className="h-4 w-4" />} label="Detector" value={detail.detector_name} />}
+            </div>
+          )}
+
+          {/* Evidence Logs - inline right after technical details */}
+          <EvidenceLogs
+            evidence={evidence}
+            loading={loadingEvidence}
+            page={evidencePage}
+            onPageChange={handleEvidencePageChange}
+          />
+
+          {/* Attachments */}
+          {detail.attachments && detail.attachments.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Paperclip className="h-4 w-4 text-muted-foreground" />
+                <h4 className="text-sm font-semibold">Attachments</h4>
+                <Badge variant="secondary" className="text-[10px]">{detail.attachments.length}</Badge>
+              </div>
+              <div className="space-y-1">
+                {detail.attachments.map((att) => (
+                  <div key={att.id} className="flex items-center gap-2 text-sm rounded-lg border bg-muted/20 px-3 py-2">
+                    <Paperclip className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span className="font-medium truncate">{att.filename}</span>
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      {att.uploaded_at && format(new Date(att.uploaded_at), "MMM d, yyyy")}
+                      {att.uploaded_by && ` by ${formatPersonName(att.uploaded_by)}`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Related Findings */}
+          {detail.related_findings && detail.related_findings.length > 0 && (
+            <div className="rounded-lg border bg-muted/30 p-4">
+              <DetailRow icon={<FileText className="h-4 w-4" />} label="Related Findings"
+                value={
+                  <div className="flex flex-wrap gap-1">
+                    {detail.related_findings.map(id => (
+                      <Badge key={id} variant="outline" className="font-mono text-[10px]">{id.slice(0, 8)}...</Badge>
+                    ))}
+                  </div>
+                } />
+            </div>
+          )}
+
+          <Separator />
+
+          {/* Comments from API */}
+          <CommentsSection comments={comments} loading={loadingComments} />
+
+          {/* Local Notes */}
+          <div className="space-y-3">
+            <h4 className="text-sm font-semibold flex items-center gap-2">
+              <StickyNote className="h-4 w-4 text-blue-600" />
+              Notes
+              {noteCount > 0 && (
+                <Badge variant="secondary" className="text-[10px]">{noteCount}</Badge>
+              )}
+            </h4>
+
+            {annotation?.notes && annotation.notes.length > 0 ? (
+              <div className="space-y-2">
+                {[...annotation.notes].reverse().map((note, i) => (
+                  <div key={i} className={`rounded-lg border p-3 text-sm ${note.author === "System" ? "bg-muted/20 border-dashed" : "bg-muted/30"}`}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium">{note.author}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(note.timestamp), { addSuffix: true })}
+                      </span>
+                    </div>
+                    <p className="text-sm whitespace-pre-wrap">{note.text}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground py-2">No notes yet. Add one below.</p>
+            )}
+
+            <div className="flex gap-2">
+              <Textarea
+                placeholder="Add a note..."
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                rows={2}
+                className="flex-1"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    handleAddNote();
+                  }
+                }}
+              />
+              <Button size="sm" className="self-end" onClick={handleAddNote} disabled={!newNote.trim()}>
+                <Send className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Press Ctrl+Enter to send. Notes are stored locally in your browser.</p>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
