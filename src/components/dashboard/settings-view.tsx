@@ -49,9 +49,10 @@ interface CredentialsStatus {
 
 interface SettingsViewProps {
   onDemoModeChange?: (demoMode: boolean) => void;
+  onCredentialsSaved?: () => void;
 }
 
-export function SettingsView({ onDemoModeChange }: SettingsViewProps) {
+export function SettingsView({ onDemoModeChange, onCredentialsSaved }: SettingsViewProps) {
   const [status, setStatus] = useState<CredentialsStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -102,10 +103,10 @@ export function SettingsView({ onDemoModeChange }: SettingsViewProps) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to save");
 
-      setSuccess("Credentials validated and saved successfully");
+      setSuccess("Credentials validated and saved — loading your data...");
       setForm({ clientId: "", clientSecret: "" });
       await fetchStatus();
-      onDemoModeChange?.(false);
+      onCredentialsSaved?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
     } finally {

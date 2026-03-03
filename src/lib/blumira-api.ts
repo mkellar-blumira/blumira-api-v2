@@ -275,11 +275,24 @@ export async function fetchAccountDetail(
 export async function fetchAllFindings(
   token: string
 ): Promise<Finding[]> {
-  const res = await apiGet<ApiResponse<Finding[]>>(
-    "/msp/accounts/findings",
-    token
-  );
-  return res.data || [];
+  const allFindings: Finding[] = [];
+  let page = 1;
+  const pageSize = 200;
+
+  while (true) {
+    const res = await apiGet<ApiResponse<Finding[]> & { meta?: { total_pages?: number } }>(
+      `/msp/accounts/findings?page=${page}&page_size=${pageSize}`,
+      token
+    );
+    const batch = res.data || [];
+    allFindings.push(...batch);
+
+    const totalPages = res.meta?.total_pages;
+    if (!totalPages || page >= totalPages || batch.length < pageSize) break;
+    page++;
+  }
+
+  return allFindings;
 }
 
 export async function fetchAccountFindings(

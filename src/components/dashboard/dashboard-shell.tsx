@@ -31,6 +31,7 @@ interface DashboardData {
   requiresAuth?: boolean;
   hasCredentials?: boolean;
   authError?: string;
+  warnings?: string[];
 }
 
 export function DashboardShell() {
@@ -102,6 +103,12 @@ export function DashboardShell() {
       setError("Failed to enable demo mode");
     }
   };
+
+  const handleCredentialsSaved = useCallback(() => {
+    setActiveView("overview");
+    setLoading(true);
+    fetchData();
+  }, [fetchData]);
 
   const findings = data?.findings || [];
   const criticalCount = findings.filter((f) => f.priority === 1).length;
@@ -220,6 +227,21 @@ export function DashboardShell() {
           </div>
         )}
 
+        {data?.warnings && data.warnings.length > 0 && !demoMode && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border-b border-amber-500/20 text-amber-300 text-sm">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span className="flex-1">
+              Some data failed to load: {data.warnings.join("; ")}.{" "}
+              <button
+                className="underline hover:text-amber-200 transition-colors"
+                onClick={handleRefresh}
+              >
+                Retry
+              </button>
+            </span>
+          </div>
+        )}
+
         <Header
           onRefresh={handleRefresh}
           refreshing={refreshing}
@@ -284,7 +306,7 @@ export function DashboardShell() {
             <AnalyticsView findings={findings} />
           )}
           {activeView === "settings" && (
-            <SettingsView onDemoModeChange={handleDemoModeChange} />
+            <SettingsView onDemoModeChange={handleDemoModeChange} onCredentialsSaved={handleCredentialsSaved} />
           )}
         </main>
       </div>
