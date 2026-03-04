@@ -195,14 +195,15 @@ function formatPersonName(person: { first_name?: string; last_name?: string; ema
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
-  const handleCopy = () => {
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
   return (
-    <button onClick={handleCopy} className="text-neutral-500 hover:text-neutral-300 transition-colors p-0.5" title="Copy value">
-      {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+    <button onClick={handleCopy} className="text-muted-foreground hover:text-foreground transition-colors p-0.5" title="Copy value">
+      {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
     </button>
   );
 }
@@ -213,12 +214,12 @@ function formatEvidenceValue(value: unknown): string {
   return String(value);
 }
 
-function formatKeyLabel(key: string): string {
-  if (key === "__time_matched") return "time";
-  return key.replace(/_/g, " ");
+function formatColumnHeader(key: string): string {
+  if (key === "__time_matched") return "Time Matched";
+  return key;
 }
 
-function EvidenceLogs({
+function EvidenceTable({
   evidence,
   loading,
   page,
@@ -233,10 +234,10 @@ function EvidenceLogs({
 
   if (loading) {
     return (
-      <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-4">
-        <div className="flex items-center gap-2">
-          <Loader2 className="h-4 w-4 animate-spin text-neutral-500" />
-          <span className="text-sm text-neutral-400 font-mono">Loading evidence logs...</span>
+      <div className="rounded-lg border bg-muted/30 p-6">
+        <div className="flex items-center justify-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">Loading evidence...</span>
         </div>
       </div>
     );
@@ -244,117 +245,149 @@ function EvidenceLogs({
 
   if (!evidence || evidence.data.length === 0) {
     return (
-      <div className="rounded-lg border border-neutral-800 bg-neutral-950 p-6 text-center">
-        <Terminal className="h-6 w-6 text-neutral-600 mx-auto mb-2" />
-        <p className="text-sm text-neutral-500 font-mono">No evidence logs available</p>
+      <div className="rounded-lg border bg-muted/30 p-6 text-center">
+        <Terminal className="h-6 w-6 text-muted-foreground mx-auto mb-2 opacity-50" />
+        <p className="text-sm text-muted-foreground">No evidence available for this finding</p>
       </div>
     );
   }
 
   const keys = evidence.evidence_keys;
   const meta = evidence.meta;
+  const previewKeys = keys.slice(0, 5);
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Terminal className="h-4 w-4 text-muted-foreground" />
-          <h4 className="text-sm font-semibold">Evidence Logs</h4>
-          <Badge variant="secondary" className="text-[10px]">{meta.total_items} log{meta.total_items !== 1 ? "s" : ""}</Badge>
+          <h4 className="text-sm font-semibold">Evidence</h4>
+          <Badge variant="secondary" className="text-[10px]">{meta.total_items} record{meta.total_items !== 1 ? "s" : ""}</Badge>
+          {keys.length > 5 && (
+            <span className="text-[10px] text-muted-foreground">{keys.length} fields</span>
+          )}
         </div>
         {meta.total_pages > 1 && (
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline" size="icon" className="h-6 w-6"
-              disabled={page <= 1}
-              onClick={() => onPageChange(page - 1)}
-            >
+            <Button variant="outline" size="icon" className="h-6 w-6" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
               <ChevronLeft className="h-3 w-3" />
             </Button>
-            <span className="text-xs text-muted-foreground">
-              {meta.page}/{meta.total_pages}
-            </span>
-            <Button
-              variant="outline" size="icon" className="h-6 w-6"
-              disabled={page >= meta.total_pages}
-              onClick={() => onPageChange(page + 1)}
-            >
+            <span className="text-xs text-muted-foreground">{meta.page}/{meta.total_pages}</span>
+            <Button variant="outline" size="icon" className="h-6 w-6" disabled={page >= meta.total_pages} onClick={() => onPageChange(page + 1)}>
               <ChevronRight className="h-3 w-3" />
             </Button>
           </div>
         )}
       </div>
 
-      <div className="rounded-lg border border-neutral-800 bg-neutral-950 overflow-hidden">
-        <div className="max-h-[360px] overflow-y-auto">
-          {evidence.data.map((row, idx) => {
-            const isExpanded = expandedRow === idx;
-            const timeVal = row["__time_matched"] ? formatEvidenceValue(row["__time_matched"]) : null;
-            const summaryKeys = keys.filter(k => k !== "__time_matched");
-
-            return (
-              <div key={idx}>
-                <button
-                  onClick={() => setExpandedRow(isExpanded ? null : idx)}
-                  className={`w-full text-left px-3 py-1.5 font-mono text-xs border-b border-neutral-800/60 transition-colors hover:bg-neutral-900 ${isExpanded ? "bg-neutral-900" : ""}`}
-                >
-                  <div className="flex items-start gap-2 min-w-0">
-                    <span className="text-neutral-600 shrink-0 w-4 pt-px">
-                      {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                    </span>
-                    {timeVal && (
-                      <span className="text-neutral-500 shrink-0">
-                        {(() => {
-                          try { return format(new Date(timeVal), "HH:mm:ss.SSS"); }
-                          catch { return timeVal; }
-                        })()}
-                      </span>
-                    )}
-                    <span className="text-neutral-200 truncate">
-                      {summaryKeys.slice(0, 4).map((k) => {
-                        const v = formatEvidenceValue(row[k]);
-                        if (!v) return null;
-                        return (
-                          <span key={k}>
-                            <span className="text-blue-400">{formatKeyLabel(k)}</span>
-                            <span className="text-neutral-500">=</span>
-                            <span className="text-emerald-300">{v}</span>
-                            <span className="text-neutral-700 mx-1.5">|</span>
-                          </span>
-                        );
-                      })}
-                      {summaryKeys.length > 4 && (
-                        <span className="text-neutral-600">+{summaryKeys.length - 4} more</span>
-                      )}
-                    </span>
-                  </div>
-                </button>
-                {isExpanded && (
-                  <div className="bg-neutral-900/80 border-b border-neutral-800/60 px-3 py-2.5">
-                    <div className="grid gap-1 ml-6">
-                      {keys.map(key => {
-                        const val = formatEvidenceValue(row[key]);
-                        if (!val) return null;
-                        return (
-                          <div key={key} className="flex items-start gap-2 font-mono text-xs group min-w-0">
-                            <span className="text-blue-400 shrink-0 min-w-[120px] text-right">{formatKeyLabel(key)}</span>
-                            <span className="text-neutral-600">:</span>
-                            <span className="text-neutral-200 break-all flex-1 select-all">{val}</span>
-                            <span className="opacity-0 group-hover:opacity-100 transition-opacity">
-                              <CopyButton text={val} />
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+      <div className="rounded-lg border overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-muted/50 border-b">
+                <th className="w-7 px-2 py-2.5" />
+                {previewKeys.map(key => (
+                  <th key={key} className="px-3 py-2.5 text-left font-semibold text-muted-foreground whitespace-nowrap">
+                    {formatColumnHeader(key)}
+                  </th>
+                ))}
+                {keys.length > 5 && (
+                  <th className="px-3 py-2.5 text-left font-medium text-muted-foreground">
+                    +{keys.length - 5}
+                  </th>
                 )}
-              </div>
-            );
-          })}
+              </tr>
+            </thead>
+            <tbody>
+              {evidence.data.map((row, idx) => {
+                const isExpanded = expandedRow === idx;
+                return (
+                  <EvidenceTableRow
+                    key={idx}
+                    row={row}
+                    idx={idx}
+                    previewKeys={previewKeys}
+                    allKeys={keys}
+                    isExpanded={isExpanded}
+                    onToggle={() => setExpandedRow(isExpanded ? null : idx)}
+                  />
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
+  );
+}
+
+function EvidenceTableRow({
+  row,
+  idx,
+  previewKeys,
+  allKeys,
+  isExpanded,
+  onToggle,
+}: {
+  row: EvidenceRow;
+  idx: number;
+  previewKeys: string[];
+  allKeys: string[];
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  const hasExtra = allKeys.length > 5;
+
+  return (
+    <>
+      <tr
+        className={`border-b last:border-0 cursor-pointer transition-colors ${isExpanded ? "bg-muted/40" : "hover:bg-muted/20"}`}
+        onClick={onToggle}
+      >
+        <td className="px-2 py-2 text-center text-muted-foreground">
+          {isExpanded ? <ChevronUp className="h-3 w-3 inline" /> : <ChevronDown className="h-3 w-3 inline" />}
+        </td>
+        {previewKeys.map(key => {
+          const val = formatEvidenceValue(row[key]);
+          const isTime = key === "__time_matched" || key === "Timestamp" || key === "timestamp_parsed";
+          return (
+            <td key={key} className="px-3 py-2 max-w-[180px] truncate whitespace-nowrap" title={val}>
+              {isTime && val ? (
+                <span className="font-mono text-muted-foreground">
+                  {(() => { try { return format(new Date(val), "yyyy-MM-dd HH:mm:ss"); } catch { return val; } })()}
+                </span>
+              ) : (
+                <span className="font-mono">{val || <span className="text-muted-foreground/50">—</span>}</span>
+              )}
+            </td>
+          );
+        })}
+        {hasExtra && (
+          <td className="px-3 py-2 text-muted-foreground">...</td>
+        )}
+      </tr>
+      {isExpanded && (
+        <tr className="bg-muted/20">
+          <td colSpan={previewKeys.length + (hasExtra ? 2 : 1)} className="px-4 py-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5">
+              {allKeys.map(key => {
+                const val = formatEvidenceValue(row[key]);
+                if (!val) return null;
+                return (
+                  <div key={key} className="flex items-start gap-2 text-xs group min-w-0 py-0.5">
+                    <span className="font-semibold text-muted-foreground shrink-0 min-w-[140px]">{formatColumnHeader(key)}</span>
+                    <span className="font-mono break-all flex-1 select-all">{val}</span>
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <CopyButton text={val} />
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
@@ -754,8 +787,8 @@ export function FindingDetailDialog({
             </div>
           )}
 
-          {/* Evidence Logs - inline right after technical details */}
-          <EvidenceLogs
+          {/* Evidence table - inline right after technical details */}
+          <EvidenceTable
             evidence={evidence}
             loading={loadingEvidence}
             page={evidencePage}
